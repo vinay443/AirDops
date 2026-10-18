@@ -25,7 +25,7 @@ and only while your AirPods are connected:
 
 1. Download `AirDops.exe` from the latest
    [GitHub Actions build](../../actions/workflows/build.yml) (open the newest green run → *Artifacts* → `AirDops-windows`)
-   or from [Releases](../../releases) once one is published.
+   or from [Releases](../../releases).
    Check it against `SHA256SUMS.txt` if you like:
    `Get-FileHash AirDops.exe`.
 2. Run it. Windows SmartScreen may warn because the exe isn't code-signed
@@ -83,6 +83,10 @@ ANC mode from the PC, Spatial Audio / head tracking, automatic switching
 between Apple devices, Conversation Awareness and firmware updates. These rely
 on Apple's private protocol, which Windows' Bluetooth stack doesn't expose to
 apps.
+
+## Testing
+
+See [TESTING.md](TESTING.md) for a 15-minute checklist with real AirPods.
 
 ## Troubleshooting
 
