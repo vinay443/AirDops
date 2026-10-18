@@ -81,7 +81,7 @@ class Controller:
         self._applied_mode: Optional[str] = None  # mode last applied while connected
         self._was_connected = False
         self._lock = threading.RLock()
-        self._warned_no_cable = False
+        self._force_capture = False
         self._warned_disable_failed = False
         self._ns_failed_for: Optional[str] = None
         self._we_set_capture: Optional[str] = None
@@ -185,13 +185,8 @@ class Controller:
             self._stop_pipeline()
             return False
         if not (plan.cable_render_id and plan.cable_capture_id):
+            # No VB-Cable: the panel shows a "Get VB-Cable" link; no nagging.
             self._stop_pipeline()
-            if not self._warned_no_cable:
-                self._warned_no_cable = True
-                self.notify(
-                    "Noise suppression needs VB-Cable",
-                    "Install the free VB-Audio Virtual Cable to clean up your mic. Using the laptop mic directly for now.",
-                )
             return False
         if self._pipeline is not None and self._pipeline.mic_name != plan.mic_name:
             self._stop_pipeline()
@@ -230,7 +225,8 @@ class Controller:
 
         ns = self._ensure_pipeline(plan)
         capture = plan.cable_capture_id if ns else plan.mic_id
-        if capture and (first or capture != self._we_set_capture):
+        if capture and (first or self._force_capture or capture != self._we_set_capture):
+            self._force_capture = False
             if self.audio.set_default(capture, ALL_ROLES):
                 self._we_set_capture = capture
         self.status.mic_name = router.short_name(plan.mic_name)
@@ -340,10 +336,11 @@ class Controller:
         """Re-apply after a toggle (noise suppression, ducking...)."""
         with self._lock:
             self._ns_failed_for = None
-            self._warned_no_cable = False
             if not self.settings.prevent_ducking:
                 self._set_ducking(False)
-            self._applied_mode = None  # forces a full re-apply on next tick
+            # Re-pick the default mic on the next tick, but don't touch the
+            # playback device (the user may have chosen speakers on purpose).
+            self._force_capture = True
 
     def restore_all(self) -> None:
         """Undo everything AirDops changed (on quit, or from the menu)."""

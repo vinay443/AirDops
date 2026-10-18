@@ -9,10 +9,12 @@ can check it, and explains why it is safe for the source to be public.
 |---|---|---|
 | Windows sound devices | Changes default playback/recording device; disables/re-enables the AirPods' hands-free endpoints | The core feature. Every change is recorded in `state.json` and undone on disconnect, on quit, from the menu, or with `--restore`. Endpoints you disabled yourself are never touched. |
 | Registry `HKCU\Software\Microsoft\Multimedia\Audio\UserDuckingPreference` | Set to "do nothing" while AirPods are connected in Game mode, original value restored afterwards | Stop game audio being turned down during voice chat |
-| Registry `HKCU\...\CurrentVersion\Run\AirDops` | Only when you tick *Start with Windows* | Auto-start (per-user, no admin) |
+| Registry `HKCU\...\CurrentVersion\Run\AirDops` | Only when you turn on *Open at Login* | Auto-start (per-user, no admin) |
+| Installer (optional) | Copies the app to `%LOCALAPPDATA%\Programs\AirDops`, adds a Start menu shortcut and an uninstall entry. No admin rights. The uninstaller runs `AirDops.exe --uninstall` first to restore your audio settings. | Normal install / clean uninstall |
 | Microphone | Reads the mic you chose and plays the cleaned audio into VB-Cable, only while noise suppression is on | Noise suppression. Audio is processed in memory 10 ms at a time and never saved or sent anywhere. |
 | Bluetooth LE | Listens (passively decodes) for AirPods broadcast packets while your AirPods are connected | Battery level and ear detection. Never pairs, connects or sends anything. |
 | Media sessions | Pauses/resumes apps that were playing | Ear-detection auto-pause |
+| Keyboard | Registers one global shortcut (Ctrl+Alt+M by default) with Windows' `RegisterHotKey`. AirDops only ever learns that *that* combination was pressed. It never sees other keystrokes and has no keyboard hook. | Switch Game/Call Mode from inside a game |
 | Local named pipe `AirDops-<user>` | Accessible only to your Windows user; the only message it accepts is "show" | Launching AirDops a second time opens the running instance's panel |
 | Files | `%APPDATA%\AirDops\settings.json`, `%LOCALAPPDATA%\AirDops\` (state, logs, diagnostics) | Settings and undo information |
 

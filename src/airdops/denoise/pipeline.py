@@ -126,17 +126,36 @@ class NoisePipeline:
             api = _wasapi_index(sd)
             if extra and not (in_info["hostapi"] == api and out_info["hostapi"] == api):
                 extra = None
-            stream = sd.Stream(
-                device=(in_idx, out_idx),
-                samplerate=SAMPLE_RATE,
-                blocksize=FRAME_SIZE,
-                dtype="float32",
-                channels=(in_ch, out_ch),
-                latency="low",
-                extra_settings=extra,
-                callback=self._callback,
-            )
-            stream.start()
+            stream = None
+            last_error: Exception | None = None
+            # Prefer low latency; fall back to safer settings on picky drivers.
+            for latency, settings in (("low", extra), ("high", extra), ("high", None)):
+                try:
+                    stream = sd.Stream(
+                        device=(in_idx, out_idx),
+                        samplerate=SAMPLE_RATE,
+                        blocksize=FRAME_SIZE,
+                        dtype="float32",
+                        channels=(in_ch, out_ch),
+                        latency=latency,
+                        extra_settings=settings,
+                        callback=self._callback,
+                    )
+                    stream.start()
+                    break
+                except Exception as exc:  # noqa: BLE001 - PortAudioError and friends
+                    last_error = exc
+                    log.info("stream open failed (latency=%s, wasapi=%s): %s", latency, settings is not None, exc)
+                    if stream is not None:
+                        try:
+                            stream.close()
+                        except Exception:  # noqa: BLE001
+                            pass
+                    stream = None
+            if stream is None:
+                self._denoiser.close()
+                self._denoiser = None
+                raise RuntimeError(f"could not open audio devices: {last_error}")
             self._stream = stream
             log.info("noise suppression running: %s -> %s", in_info["name"], out_info["name"])
 

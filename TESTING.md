@@ -10,6 +10,10 @@ If anything fails, open the panel, choose **More → Run Diagnostics**, and atta
 - [ ] Start `AirDops.exe`. An "AirDops is running" banner slides in and an AirPods glyph appears in the tray (check the `^` overflow and drag it onto the taskbar).
 - [ ] Run `AirDops.exe` again: no second copy starts; the panel opens instead.
 
+## 0b. Installer
+- [ ] Run `AirDops-Setup.exe`: no admin prompt; it installs, offers "Open AirDops now", and adds *AirDops* to the Start menu.
+- [ ] First launch shows the **Welcome** sheet (it correctly says whether VB-Cable is installed). *Continue* opens the panel.
+
 ## 1. Look and feel
 - [ ] Click the tray icon: the panel fades in just above the tray, with rounded corners and a shadow. Click elsewhere or press Esc to close it.
 - [ ] Switch Windows to dark mode (*Settings → Personalization → Colors*): within a few seconds the panel turns dark, and the tray glyph matches the taskbar.
@@ -37,6 +41,10 @@ If anything fails, open the panel, choose **More → Run Diagnostics**, and atta
 - [ ] Play a YouTube video or Spotify and take one AirPod out: playback **pauses** within 1-2 s. Put it back: it **resumes**. The status line shows "In Use" while worn.
 - [ ] Low battery (≤ 20%): a Windows notification appears once, and the tray glyph gets an orange dot (red at 10% or below).
 
+## 5b. Mic meter, boost and hotkey
+- [ ] With noise suppression on, the panel shows **Input Level** bars that move when you talk, and a **Mic Boost** slider; raising it makes you louder in the Discord mic test.
+- [ ] In a game, press **Ctrl+Alt+M**: a "Call Mode" banner appears and the mode switches; press it again to go back to Game Mode.
+
 ## 6. Call Mode
 - [ ] Choose **Call Mode**: the pill slides over, the AirPods mic is re-enabled and becomes the default input. Audio drops to call quality while the mic is in use, which is expected.
 - [ ] Back to **Game Mode**: the AirPods mic is disabled again.
@@ -44,3 +52,4 @@ If anything fails, open the panel, choose **More → Run Diagnostics**, and atta
 ## 7. Undo
 - [ ] **Quit**: the AirPods mic is re-enabled, your normal mic is the default again, and ducking is back to what it was.
 - [ ] **Open at Login**: turn it on, sign out and back in, and AirDops starts quietly in the tray.
+- [ ] Uninstall from *Settings → Apps*: Windows audio is put back, and the login item and app files are removed.

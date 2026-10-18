@@ -26,9 +26,9 @@ CONNECTED = ViewState(
     cable_installed=True,
     ns_active=True,
     hfp_blocked=True,
-    version="0.2.0",
+    version="0.3.0",
 )
-DISCONNECTED = ViewState(connected=False, name="AirPods", cable_installed=False, version="0.2.0")
+DISCONNECTED = ViewState(connected=False, name="AirPods", cable_installed=False, version="0.3.0")
 CALL = ViewState(
     connected=True,
     name="AirPods Pro 2",
@@ -39,7 +39,7 @@ CALL = ViewState(
     case=None,
     mic_name="AirPods Pro 2 mic",
     cable_installed=True,
-    version="0.2.0",
+    version="0.3.0",
 )
 
 

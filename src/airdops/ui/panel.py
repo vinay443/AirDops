@@ -422,9 +422,18 @@ class Panel(QWidget):
             screen = self.screen() or QGuiApplication.primaryScreen()
             max_card_h = screen.availableGeometry().height() - 2 * SHADOW - 16 if screen else want
         h = min(want, max_card_h)
+        if h == self.card.height() and self.card.minimumHeight() == h:
+            return
+        old = self.geometry()
         self.scroll.setFixedHeight(h)
         self.card.setFixedHeight(h)
         self.adjustSize()
+        # While open above a bottom taskbar, grow upwards so the panel never
+        # slides under the taskbar when rows appear or disappear.
+        if self.isVisible() and self._slide.state() != QPropertyAnimation.State.Running:
+            screen = self.screen() or QGuiApplication.primaryScreen()
+            if screen and old.center().y() > screen.availableGeometry().center().y():
+                self.move(old.x(), old.bottom() - self.height() + 1)
 
     # ---------------------------------------------------------- painting
     def paintEvent(self, event) -> None:  # noqa: N802

@@ -95,6 +95,8 @@ class Core:
 
     def stop(self) -> None:
         """Stop and undo every change (runs the restore on the worker thread)."""
+        if self._stop.is_set():
+            return
         self._stop.set()
         self._wake.set()
         if self._worker:
@@ -163,7 +165,8 @@ class Core:
         st = self.controller.status
         pods = self._pods_fresh() if st.connected else None
         s = self.settings
-        name = (pods.model_name if pods else st.device_name) or "AirPods"
+        # Prefer the name the user gave their AirPods ("Vinay's AirPods Pro"), like Apple does.
+        name = st.device_name or (pods.model_name if pods else "") or "AirPods"
         return ViewState(
             connected=st.connected,
             name=name,

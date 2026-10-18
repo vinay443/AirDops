@@ -116,7 +116,7 @@ def test_game_mode_lifecycle_without_cable():
     assert all(audio.defaults[(RENDER, r)] == "st" for r in range(3))
     assert all(audio.defaults[(CAPTURE, r)] == "mic" for r in range(3))
     assert duck.value == 3 and c.state.ducking_changed
-    assert "Noise suppression needs VB-Cable" in notes
+    assert notes == []  # no nagging about VB-Cable
 
     audio.plug(False)
     st = c.tick()
@@ -206,3 +206,15 @@ def test_first_run_with_airpods_already_connected_restores_a_real_mic():
     audio.plug(False)
     c.tick()
     assert all(audio.defaults[(CAPTURE, r)] == "mic" for r in range(3))  # not left on the silent cable
+
+
+def test_settings_change_does_not_steal_playback():
+    c, audio, duck, notes = make()
+    audio.plug(True)
+    c.tick()
+    audio.defaults[(RENDER, 0)] = "spk"  # user switches to laptop speakers on purpose
+    c.settings.prevent_ducking = False
+    c.settings_changed()
+    c.tick()
+    assert audio.defaults[(RENDER, 0)] == "spk"
+    assert duck.value is None

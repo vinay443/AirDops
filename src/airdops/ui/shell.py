@@ -134,7 +134,7 @@ class Shell:
     def diagnostics(self) -> None:
         self.panel.hide()
         self.core.diagnostics()
-        self.tray.showMessage("Running Diagnostics", "The report opens in a few seconds.", app_icon(), 3000)
+        self.toast.popup(self.core.snapshot(), "Running Diagnostics", "The report opens in about 10 seconds", ms=3500)
 
     def open_logs(self) -> None:
         self.panel.hide()
@@ -300,9 +300,13 @@ class Shell:
         )
         self._refresh()
 
-    def _show_welcome(self) -> None:
+    def _show_welcome(self, waited: float = 0.0) -> None:
         from .welcome import Welcome
 
+        # Wait for the first device scan so "VB-Cable installed" is accurate.
+        if not getattr(self.core.controller, "endpoints", None) and waited < 4.0:
+            QTimer.singleShot(250, lambda: self._show_welcome(waited + 0.25))
+            return
         st = self.core.snapshot()
 
         def done(open_at_login: bool) -> None:
@@ -316,13 +320,15 @@ class Shell:
     # ---------------------------------------------------------------- run
     def run(self) -> int:
         self.core.start()
+        # Windows sign-out / shutdown: still put the audio settings back.
+        self.app.aboutToQuit.connect(self.core.stop)
         self.tray.show()
         self.timer.start()
         hk = getattr(self.core.settings, "hotkey", "")
         if hk:
             self.hotkey.register(hk)
         if not getattr(self.core.settings, "onboarded", True):
-            QTimer.singleShot(700, self._show_welcome)
+            QTimer.singleShot(500, self._show_welcome)
         elif not self.background:
             running = ViewState(name="AirDops is running", mode=self.core.settings.mode)
             QTimer.singleShot(

@@ -27,23 +27,25 @@ and only while your AirPods are connected:
 </p>
 <p align="center">
   <img src="docs/screenshots/toast-light.png" width="330" alt="Connected banner">
+  <img src="docs/screenshots/welcome-light.png" width="330" alt="Welcome sheet">
 </p>
 
 ## Install
 
-1. Download `AirDops.exe` from the latest
-   [GitHub Actions build](../../actions/workflows/build.yml) (open the newest green run → *Artifacts* → `AirDops-windows`)
-   or from [Releases](../../releases).
-   Check it against `SHA256SUMS.txt` if you like:
-   `Get-FileHash AirDops.exe`.
-2. Run it. Windows SmartScreen may warn because the exe isn't code-signed
+1. From [Releases](../../releases), download **`AirDops-Setup.exe`** (recommended:
+   installs for your user only with no admin prompt, adds a Start menu entry,
+   starts faster, and the uninstaller puts your Windows audio back) or the
+   portable **`AirDops.exe`** (single file, nothing installed).
+   Check either against `SHA256SUMS.txt` if you like: `Get-FileHash AirDops-Setup.exe`.
+2. Run it. Windows SmartScreen may warn because the files aren't code-signed
    (signing certificates cost money). Choose *More info → Run anyway*. The
-   source and the build that produced the exe are both public in this repo.
+   source and the build that produced them are both public in this repo.
 3. **For noise suppression (recommended):** install the free
    [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) and reboot. AirDops
    sends your cleaned-up mic into it and makes "CABLE Output" your default
    microphone. Without it, AirDops still works and uses the laptop mic directly.
-4. Open the panel from the tray icon and turn on **Open at Login**.
+4. A welcome sheet walks you through it the first time, including
+   **Open at Login**.
 
 In Discord, set *Input device* to **Default**, or to "CABLE Output" if you use
 noise suppression. Then turn off Discord's own Krisp noise suppression, or keep
@@ -58,12 +60,15 @@ uses the Inter typeface.
 * **Header**: your AirPods, their connection state, and whether they're in your ears.
 * **Battery rings** for left, right and case, with charging indicators (green), and orange/red when low.
 * **Game Mode / Call Mode** segmented control.
-* **Microphone**: pick the input, plus *Noise Suppression* and *Voice Gate* switches.
-* **Sound & AirPods**: *Keep Game Volume* (no ducking), *Automatic Ear Detection*, *Low Battery Alerts*, *Open at Login*.
+* **Microphone**: pick the input. While noise suppression runs you also get a live **Input Level** meter and a **Mic Boost** slider, plus *Noise Suppression* and *Voice Gate* switches.
+* **Sound & AirPods**: *Keep Game Volume* (no ducking), *Automatic Ear Detection* (pause when either or both AirPods come out), *Low Battery Alerts*, *Open at Login*.
 * **More**: Bluetooth settings, diagnostics, logs, the settings file, *Restore Windows Audio Settings*.
 
+Press **Ctrl+Alt+M** anywhere, even in a game, to flip between Game and Call
+Mode (change or turn it off with `hotkey` in the settings file).
+
 When your AirPods connect, a banner slides in above the tray, like the
-iPhone pop-up. Right-click the tray icon for a quick menu. The tray glyph is
+iPhone pop-up. Low-battery alerts use the same banner. Right-click the tray icon for a quick menu. The tray glyph is
 monochrome and adapts to a light or dark taskbar, with an orange or red dot
 when the battery is low. Launching AirDops again just opens the panel.
 
@@ -78,6 +83,7 @@ when the battery is low. Launching AirDops again just opens the panel.
 | `mic_gain_db` | `0` | Extra mic boost after noise suppression (-12 to +24). |
 | `auto_pause_trigger` | `"one"` | `"one"`: pause when either bud comes out. `"both"`: only when both do. |
 | `low_battery_percent` | `20` | Notification threshold. |
+| `hotkey` | `"Ctrl+Alt+M"` | Global shortcut for Game/Call Mode, e.g. `"Ctrl+Shift+F9"`; `""` turns it off. Needs Ctrl, Alt or Win. |
 | `ble_min_rssi` | `-70` | Ignore weaker AirPods broadcasts (filters out other people's AirPods). Use `-80` if battery never shows. |
 
 ## What AirPods Pro features can and can't work on Windows
