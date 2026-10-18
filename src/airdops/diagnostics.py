@@ -200,15 +200,39 @@ def self_test(out_path: str) -> int:
         import comtypes  # noqa: F401
         import numpy  # noqa: F401
         import pycaw  # noqa: F401
-        import pystray  # noqa: F401
         import sounddevice  # noqa: F401
         from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager  # noqa: F401
 
-        from . import app, controller, media  # noqa: F401
+        from . import controller, core, media  # noqa: F401
         from .ble import scanner  # noqa: F401
         from .denoise import pipeline  # noqa: F401
+        from .ui import panel, shell, toast  # noqa: F401
 
         return ""
+
+    def ui() -> str:
+        import tempfile
+
+        from PySide6.QtGui import QImage
+        from PySide6.QtWidgets import QApplication
+
+        from .ui import theme
+        from .ui.preview import render_all
+
+        app = QApplication.instance() or QApplication([])
+        theme.load_fonts()
+        out = Path(out_path).with_name("previews") if out_path else Path(tempfile.mkdtemp())
+        paths = render_all(out)
+        for path in paths:
+            img = QImage(str(path))
+            if img.isNull() or img.width() < 200:
+                raise AssertionError(f"bad render {path.name}")
+        from PySide6.QtGui import QFontDatabase
+
+        if "Inter" not in QFontDatabase.families():
+            raise AssertionError("Inter font not bundled")
+        del app
+        return f"{len(paths)} screens rendered"
 
     def rnnoise() -> str:
         import numpy as np
@@ -232,12 +256,6 @@ def self_test(out_path: str) -> int:
         endpoints._policy_config()  # interface must be creatable
         return f"{len(eps)} endpoints"
 
-    def icon() -> str:
-        from . import icons
-
-        icons.render("game", 60).tobytes()
-        return ""
-
     def media_api() -> str:
         from . import media
 
@@ -251,7 +269,7 @@ def self_test(out_path: str) -> int:
 
     check("imports", imports)
     check("rnnoise", rnnoise)
-    check("icon", icon)
+    check("ui", ui)
     check("portaudio", portaudio)
     # WinRT async before COM init on this thread (COM init makes it an STA).
     check("media-session-api", media_api)

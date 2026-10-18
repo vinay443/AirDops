@@ -13,6 +13,7 @@ can check it, and explains why it is safe for the source to be public.
 | Microphone | Reads the mic you chose and plays the cleaned audio into VB-Cable, only while noise suppression is on | Noise suppression. Audio is processed in memory 10 ms at a time and never saved or sent anywhere. |
 | Bluetooth LE | Listens (passively decodes) for AirPods broadcast packets while your AirPods are connected | Battery level and ear detection. Never pairs, connects or sends anything. |
 | Media sessions | Pauses/resumes apps that were playing | Ear-detection auto-pause |
+| Local named pipe `AirDops-<user>` | Accessible only to your Windows user; the only message it accepts is "show" | Launching AirDops a second time opens the running instance's panel |
 | Files | `%APPDATA%\AirDops\settings.json`, `%LOCALAPPDATA%\AirDops\` (state, logs, diagnostics) | Settings and undo information |
 
 ## What it never does

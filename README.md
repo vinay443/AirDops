@@ -21,6 +21,14 @@ and only while your AirPods are connected:
 | 📞 **Call mode** | One click to use the AirPods mic when you actually want it (e.g. walking away from the desk). |
 | ↩️ **Undo everything** | Disconnect or quit and your normal Windows audio setup comes back. Crash-safe: changes are tracked on disk and undone next start. |
 
+<p align="center">
+  <img src="docs/screenshots/panel-connected-light.png" width="330" alt="AirDops panel, light mode">
+  <img src="docs/screenshots/panel-connected-dark.png" width="330" alt="AirDops panel, dark mode">
+</p>
+<p align="center">
+  <img src="docs/screenshots/toast-light.png" width="330" alt="Connected banner">
+</p>
+
 ## Install
 
 1. Download `AirDops.exe` from the latest
@@ -35,30 +43,33 @@ and only while your AirPods are connected:
    [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) and reboot. AirDops
    sends your cleaned-up mic into it and makes "CABLE Output" your default
    microphone. Without it, AirDops still works and uses the laptop mic directly.
-4. Right-click the tray icon and tick **Start with Windows**.
+4. Open the panel from the tray icon and turn on **Open at Login**.
 
 In Discord, set *Input device* to **Default**, or to "CABLE Output" if you use
 noise suppression. Then turn off Discord's own Krisp noise suppression, or keep
 it if you like stacking.
 
-## Tray menu
+## The app
 
-* **Game mode**: full-quality AirPods sound + laptop mic (default)
-* **Call mode**: use the AirPods mic (Windows' call-quality audio)
-* **AI noise suppression**, **Voice gate** (silences the mic between words, so even sharp keyboard clicks disappear)
-* **Pause media when AirPods are removed**
-* **Keep game volume during voice chat** (no ducking)
-* **Battery level**, **Low battery notifications**
-* **Start with Windows**
-* *More*: settings file, logs, **Run diagnostics**, **Restore Windows audio settings**
+Click the AirPods icon in the system tray to open the panel. It's designed like
+macOS Control Center and iOS Settings, follows Windows light and dark mode, and
+uses the Inter typeface.
 
-The icon is green in Game mode, blue in Call mode, grey when the AirPods
-aren't connected. The bar under it shows the lower bud's battery.
+* **Header**: your AirPods, their connection state, and whether they're in your ears.
+* **Battery rings** for left, right and case, with charging indicators (green), and orange/red when low.
+* **Game Mode / Call Mode** segmented control.
+* **Microphone**: pick the input, plus *Noise Suppression* and *Voice Gate* switches.
+* **Sound & AirPods**: *Keep Game Volume* (no ducking), *Automatic Ear Detection*, *Low Battery Alerts*, *Open at Login*.
+* **More**: Bluetooth settings, diagnostics, logs, the settings file, *Restore Windows Audio Settings*.
+
+When your AirPods connect, a banner slides in above the tray, like the
+iPhone pop-up. Right-click the tray icon for a quick menu. The tray glyph is
+monochrome and adapts to a light or dark taskbar, with an orange or red dot
+when the battery is low. Launching AirDops again just opens the panel.
 
 ## Settings file
 
-`%APPDATA%\AirDops\settings.json` (open it from *More → Open settings file*,
-then *Reload settings file*):
+`%APPDATA%\AirDops\settings.json` (open it from *More → Edit Settings File*; changes apply after restarting AirDops):
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -90,7 +101,7 @@ See [TESTING.md](TESTING.md) for a 15-minute checklist with real AirPods.
 
 ## Troubleshooting
 
-* **Run diagnostics** (*More → Run diagnostics*, or `AirDops.exe --diagnose`)
+* **Run diagnostics** (*More → Run Diagnostics*, or `AirDops.exe --diagnose`)
   writes a report with device names only (no addresses or ids) that shows
   exactly what AirDops sees and decides.
 * **"Couldn't fully block the AirPods mic"**: Windows refused to disable the
@@ -99,7 +110,7 @@ See [TESTING.md](TESTING.md) for a 15-minute checklist with real AirPods.
   AirPods → Properties → Services → untick "Handsfree Telephony"*.
 * **Battery never shows**: open the case near the PC, check Bluetooth is on,
   try `ble_min_rssi: -80`.
-* **Undo everything**: *More → Restore Windows audio settings*, or quit
+* **Undo everything**: *More → Restore Windows Audio Settings*, or quit
   AirDops and run `AirDops.exe --restore`.
 
 ## Privacy and security
@@ -124,17 +135,21 @@ Tests: `pip install -r requirements-dev.txt` then `python -m pytest`.
 
 ```
 src/airdops/
+  core.py              engine: worker thread, BLE monitor, ear detection, actions
+  controller.py        Game / Call mode state machine, undo tracking (tested with fakes)
   audio/router.py      which endpoint is which (pure logic, tested)
   audio/endpoints.py   Windows Core Audio COM: list / set default / enable-disable
   audio/ducking.py     the "communications ducking" registry preference
-  controller.py        Game / Call mode state machine, undo tracking (tested with fakes)
   denoise/             RNNoise binding + realtime WASAPI pipeline + voice gate
   ble/advert.py        AirPods BLE proximity-message parser (tested)
   ble/scanner.py       background bleak scanner, nearest-AirPods filter
   earsense.py          in-ear -> pause/resume decisions (tested)
   media.py             Windows media-session pause/resume
-  app.py               tray icon and menu
+  ui/                  Qt (PySide6) interface: panel, banner, tray, vector artwork
 ```
+
+Regenerate the screenshots with
+`QT_QPA_PLATFORM=offscreen python scripts/render_previews.py docs/screenshots`.
 
 ## License
 

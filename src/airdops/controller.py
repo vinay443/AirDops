@@ -76,6 +76,7 @@ class Controller:
         self.notify = notify
         self.status = Status(mode=settings.mode)
         self.plan = Plan()
+        self.endpoints: list[Endpoint] = []
         self._pipeline: Optional[Pipeline] = None
         self._applied_mode: Optional[str] = None  # mode last applied while connected
         self._was_connected = False
@@ -232,7 +233,7 @@ class Controller:
         if capture and (first or capture != self._we_set_capture):
             if self.audio.set_default(capture, ALL_ROLES):
                 self._we_set_capture = capture
-        self.status.mic_name = ("Clean mic (via " + plan.mic_name + ")") if ns else plan.mic_name
+        self.status.mic_name = router.short_name(plan.mic_name)
         if not plan.mic_id:
             self.status.note = "No other microphone found"
         self._set_ducking(self.settings.prevent_ducking)
@@ -242,7 +243,7 @@ class Controller:
         self._stop_pipeline()
         self.status.hfp_blocked = False
         self._set_ducking(False)
-        self.status.mic_name = plan.device_name + " mic"
+        self.status.mic_name = plan.device_name
         if self.state.disabled_endpoints:
             self._reenable_all()
             return False  # let Windows bring the endpoints back before choosing defaults
@@ -290,6 +291,7 @@ class Controller:
                 self.state.saved_defaults.get("capture"),
             )
             self.plan = plan
+            self.endpoints = list(endpoints)
             self.status.connected = plan.connected
             self.status.device_name = plan.device_name
             self.status.mode = self.settings.mode
@@ -317,6 +319,14 @@ class Controller:
             self._applied_mode = self.settings.mode if done else None
             self._was_connected = True
             return self.status
+
+    def available_mics(self) -> list[str]:
+        """Names of microphones usable in Game mode (not the AirPods, not the cable)."""
+        names = []
+        for e in self.endpoints:
+            if e.flow == CAPTURE and e.active and not router.matches(e.name, self._keywords()) and not router.is_cable(e.name):
+                names.append(e.name)
+        return names
 
     def set_mode(self, mode: str) -> None:
         with self._lock:

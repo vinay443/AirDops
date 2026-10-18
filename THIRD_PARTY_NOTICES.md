@@ -13,8 +13,9 @@ AirDops bundles or depends on the following open-source components.
 | [psutil](https://github.com/giampaolo/psutil) | BSD-3-Clause | Dependency of pycaw |
 | [python-sounddevice](https://github.com/spatialaudio/python-sounddevice) / PortAudio | MIT | Real-time audio I/O |
 | [NumPy](https://numpy.org) | BSD-3-Clause | Audio buffers |
-| [Pillow](https://python-pillow.org) | MIT-CMU (HPND) | Tray icon drawing |
-| [pystray](https://github.com/moses-palmer/pystray) | LGPL-3.0 | System tray icon |
+| [Qt for Python (PySide6)](https://www.qt.io/qt-for-python) | LGPL-3.0 | User interface. Loaded as unmodified shared libraries; you may replace them (rebuild from this repository with your own PySide6). |
+| [Inter](https://rsms.me/inter/) typeface (Rasmus Andersson) | SIL Open Font License 1.1 (bundled as `Inter-OFL.txt`) | UI font |
+| [Pillow](https://python-pillow.org) | MIT-CMU (HPND) | Build-time only: writes the .exe icon |
 | [PyInstaller](https://pyinstaller.org) bootloader | GPL-2.0 with bootloader exception | Packaging the exe |
 
 RNNoise BSD-3-Clause notice:

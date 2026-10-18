@@ -101,6 +101,16 @@ def device_label(name: str) -> str:
     return inner.strip() or name
 
 
+def short_name(name: str) -> str:
+    """'Microphone Array (Intel® Smart Sound Technology)' -> 'Microphone Array'."""
+    if " (" in name and name.endswith(")"):
+        head = name[: name.index(" (")].strip()
+        if head.lower() in ("microphone", "headset", "line in", "headphones", "speakers"):
+            return name
+        return head or name
+    return name
+
+
 def pick_mic(
     endpoints: Sequence[Endpoint],
     keywords: Iterable[str],

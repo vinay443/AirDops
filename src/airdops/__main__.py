@@ -75,31 +75,31 @@ def main(argv: list[str] | None = None) -> int:
             _message_box("Quit AirDops from the tray first, then run --restore.")
             return 1
         if not args.background:
-            _message_box("AirDops is already running - look for its icon in the system tray.")
+            from .ui.shell import signal_running_instance
+
+            if not signal_running_instance():
+                _message_box("AirDops is already running - click the AirPods icon in the system tray.")
         return 0
 
     if args.restore:
         from . import config
-        from .app import _pipeline_factory, _WinAudio
-        from .audio import ducking
         from .audio.endpoints import com_init
-        from .controller import Controller
+        from .core import make_controller
 
         com_init()
-        c = Controller(config.load_settings(), config.load_state(), _WinAudio(), ducking, _pipeline_factory, config.save_state)
-        c.restore_all()
+        make_controller(config.load_settings(), config.load_state()).restore_all()
         _message_box("AirDops changes have been undone.")
         return 0
 
-    from .app import App
-
     try:
-        App(background=args.background).run()
+        from .core import Core
+        from .ui.shell import Shell
+
+        return Shell(Core(), background=args.background).run()
     except Exception:
         logging.getLogger("airdops").exception("fatal error")
         _message_box("AirDops hit an error and closed. Details are in the log folder.")
         return 1
-    return 0
 
 
 if __name__ == "__main__":
