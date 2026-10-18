@@ -39,7 +39,7 @@ If anything fails, open the panel, choose **More → Run Diagnostics**, and atta
 ## 5. Ducking, ear detection and battery
 - [ ] With music playing, start a Discord call: the music volume does **not** drop.
 - [ ] Play a YouTube video or Spotify and take one AirPod out: playback **pauses** within 1-2 s. Put it back: it **resumes**. The status line shows "In Use" while worn.
-- [ ] Low battery (≤ 20%): a Windows notification appears once, and the tray glyph gets an orange dot (red at 10% or below).
+- [ ] Low battery (≤ 20%): a "Low Battery" banner appears once, and the tray glyph gets an orange dot (red at 10% or below).
 
 ## 5b. Mic meter, boost and hotkey
 - [ ] With noise suppression on, the panel shows **Input Level** bars that move when you talk, and a **Mic Boost** slider; raising it makes you louder in the Discord mic test.
