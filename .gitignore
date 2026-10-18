@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Build output
+build/
+dist/
+*.spec.bak
+
+# Downloaded at build time (hash-verified), never committed
+src/airdops/_vendor/*
+!src/airdops/_vendor/.gitkeep
+
+# Local runtime files - these stay on your PC only
+settings.json
+state.json
+diagnostics.txt
+selftest.txt
+*.log
+
+# Secrets should never live in this repo
+.env
+*.pem
+*.key
+*.pfx
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,136 @@
+"""Thin wrapper over the Windows Core Audio COM APIs (Windows only).
+
+* IMMDeviceEnumerator  - list endpoints and read the current defaults
+* IPolicyConfig        - the (undocumented but long-stable) interface the
+                         Sound control panel itself uses to change the default
+                         device and to enable/disable an endpoint.
+
+Every thread that calls into this module must call ``com_init()`` first.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
+from .router import CAPTURE, RENDER, Endpoint
+
+log = logging.getLogger(__name__)
+
+_FLOW = {RENDER: 0, CAPTURE: 1}
+ROLE_CONSOLE = 0
+ROLE_MULTIMEDIA = 1
+ROLE_COMMUNICATIONS = 2
+ALL_ROLES = (ROLE_CONSOLE, ROLE_MULTIMEDIA, ROLE_COMMUNICATIONS)
+_STATE_MASK_ALL = 0xF
+_STGM_READ = 0
+
+_FRIENDLY_NAME_FMTID = "{a45c254e-df1c-4efd-8020-67d146a850e0}"
+_FRIENDLY_NAME_PID = 14
+
+
+def com_init() -> None:
+    import comtypes
+
+    try:
+        comtypes.CoInitialize()
+    except OSError:
+        # Already initialised on this thread with a different model - fine.
+        pass
+
+
+def com_uninit() -> None:
+    import comtypes
+
+    try:
+        comtypes.CoUninitialize()
+    except OSError:
+        pass
+
+
+def _enumerator():
+    import comtypes
+    from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
+    from pycaw.constants import CLSID_MMDeviceEnumerator
+
+    return comtypes.CoCreateInstance(
+        CLSID_MMDeviceEnumerator, IMMDeviceEnumerator, comtypes.CLSCTX_INPROC_SERVER
+    )
+
+
+def _policy_config():
+    import comtypes
+    from pycaw.api.policyconfig import IPolicyConfig
+    from pycaw.constants import CLSID_CPolicyConfigClient
+
+    return comtypes.CoCreateInstance(CLSID_CPolicyConfigClient, IPolicyConfig, comtypes.CLSCTX_ALL)
+
+
+def _friendly_name(dev) -> str:
+    from comtypes import GUID
+    from pycaw.api.mmdeviceapi import PROPERTYKEY
+
+    key = PROPERTYKEY()
+    key.fmtid = GUID(_FRIENDLY_NAME_FMTID)
+    key.pid = _FRIENDLY_NAME_PID
+    try:
+        store = dev.OpenPropertyStore(_STGM_READ)
+        value = store.GetValue(key)
+        name = value.GetValue()
+        try:
+            value.clear()
+        except Exception:  # pragma: no cover - depends on comtypes version
+            pass
+        return str(name) if name else ""
+    except Exception as exc:  # noqa: BLE001 - COM errors vary
+        log.debug("friendly name unavailable: %r", exc)
+        return ""
+
+
+def list_endpoints() -> list[Endpoint]:
+    result: list[Endpoint] = []
+    enum = _enumerator()
+    for flow, flow_val in _FLOW.items():
+        try:
+            coll = enum.EnumAudioEndpoints(flow_val, _STATE_MASK_ALL)
+            count = coll.GetCount()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("EnumAudioEndpoints(%s) failed: %r", flow, exc)
+            continue
+        for i in range(count):
+            try:
+                dev = coll.Item(i)
+                result.append(
+                    Endpoint(id=dev.GetId(), name=_friendly_name(dev), flow=flow, state=int(dev.GetState()))
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.debug("skipping endpoint %d: %r", i, exc)
+    return result
+
+
+def get_default(flow: str, role: int) -> Optional[str]:
+    try:
+        dev = _enumerator().GetDefaultAudioEndpoint(_FLOW[flow], role)
+        return dev.GetId() if dev else None
+    except Exception:  # noqa: BLE001 - E_NOTFOUND when there is no device
+        return None
+
+
+def set_default(endpoint_id: str, roles=ALL_ROLES) -> bool:
+    try:
+        pc = _policy_config()
+        for role in roles:
+            pc.SetDefaultEndpoint(endpoint_id, role)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("SetDefaultEndpoint failed: %r", exc)
+        return False
+
+
+def set_enabled(endpoint_id: str, enabled: bool) -> bool:
+    try:
+        _policy_config().SetEndpointVisibility(endpoint_id, 1 if enabled else 0)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("SetEndpointVisibility(%s) failed: %r", enabled, exc)
+        return False

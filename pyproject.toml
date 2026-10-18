@@ -1,0 +1,14 @@
+[project]
+name = "airdops"
+dynamic = ["version"]
+description = "Full-quality AirPods audio for gaming on Windows: blocks the hands-free mode, cleans up the laptop mic, shows battery."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+
+[tool.setuptools.dynamic]
+version = { attr = "airdops.__version__" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
