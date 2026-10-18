@@ -237,12 +237,15 @@ class Controller:
             self.status.note = "No other microphone found"
         self._set_ducking(self.settings.prevent_ducking)
 
-    def _apply_call(self, plan: Plan, first: bool) -> None:
+    def _apply_call(self, plan: Plan, endpoints: Sequence[Endpoint], first: bool) -> bool:
+        """Returns False when it must run again next tick (endpoints just re-enabled)."""
         self._stop_pipeline()
+        self.status.hfp_blocked = False
+        self._set_ducking(False)
+        self.status.mic_name = plan.device_name + " mic"
         if self.state.disabled_endpoints:
             self._reenable_all()
-            first = True
-        self.status.hfp_blocked = False
+            return False  # let Windows bring the endpoints back before choosing defaults
         if first:
             if plan.render_id:
                 self.audio.set_default(plan.render_id, NON_COMM_ROLES)
@@ -250,14 +253,18 @@ class Controller:
             if plan.airpods_capture_ids:
                 self.audio.set_default(plan.airpods_capture_ids[0], ALL_ROLES)
                 self._we_set_capture = plan.airpods_capture_ids[0]
-        self.status.mic_name = plan.device_name + " mic"
-        self._set_ducking(False)
+        return True
 
     def _restore_capture_default(self, endpoints: Sequence[Endpoint]) -> None:
         current = self.audio.get_default(CAPTURE, ROLE_CONSOLE)
         if current and self._is_foreign(current, endpoints) and current != self._we_set_capture:
             return  # the user picked something else themselves; leave it
         saved = self.state.saved_defaults.get("capture")
+        if not saved:
+            # Never seen the normal default (first run with AirPods already on):
+            # fall back to the best non-AirPods, non-cable mic.
+            mic = router.pick_mic(endpoints, self._keywords(), self.settings.preferred_mic)
+            saved = mic.id if mic else None
         saved_comm = self.state.saved_defaults.get("capture_comm", saved)
         if saved:
             self.audio.set_default(saved, NON_COMM_ROLES)
@@ -300,11 +307,14 @@ class Controller:
             if not self._was_connected:
                 log.info("AirPods connected: %s", plan.device_name)
             first = self._applied_mode != self.settings.mode
+            if first:
+                self._remember_defaults(endpoints)
+            done = True
             if self.settings.mode == CALL:
-                self._apply_call(plan, first)
+                done = self._apply_call(plan, endpoints, first)
             else:
                 self._apply_game(plan, endpoints, first)
-            self._applied_mode = self.settings.mode
+            self._applied_mode = self.settings.mode if done else None
             self._was_connected = True
             return self.status
 

@@ -93,5 +93,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          PRE=""
+          case "$TAG" in *-*) PRE="--prerelease" ;; esac
           gh release create "$TAG" dist/AirDops.exe dist/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" --title "AirDops $TAG" --generate-notes
+            --repo "$GITHUB_REPOSITORY" --title "AirDops $TAG" --generate-notes $PRE

@@ -153,7 +153,8 @@ def test_call_mode_reenables_and_uses_airpods_mic():
     audio.plug(True)
     c.tick()
     c.set_mode("call")
-    c.tick()
+    c.tick()  # re-enables the AirPods endpoints
+    c.tick()  # then picks them as defaults
     assert audio.eps["hfm"].state == STATE_ACTIVE
     assert audio.defaults[(CAPTURE, 0)] == "hfm"
     assert audio.defaults[(RENDER, 0)] == "st"
@@ -193,3 +194,15 @@ def test_existing_ducking_preference_restored():
     assert duck.value == 3
     c.restore_all()
     assert duck.value == 2
+
+
+def test_first_run_with_airpods_already_connected_restores_a_real_mic():
+    FakePipeline.instances.clear()
+    c, audio, duck, notes = make(with_cable=True)
+    audio.plug(True)
+    audio.defaults.update({(CAPTURE, r): "hfm" for r in range(3)})  # Windows picked the AirPods mic
+    c.tick()
+    assert audio.defaults[(CAPTURE, 0)] == "cout"
+    audio.plug(False)
+    c.tick()
+    assert all(audio.defaults[(CAPTURE, r)] == "mic" for r in range(3))  # not left on the silent cable
