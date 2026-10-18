@@ -134,3 +134,58 @@ def set_enabled(endpoint_id: str, enabled: bool) -> bool:
     except Exception as exc:  # noqa: BLE001
         log.warning("SetEndpointVisibility(%s) failed: %r", enabled, exc)
         return False
+
+
+class DeviceWatcher:
+    """Calls ``on_change`` the instant Windows reports an audio-device change.
+
+    Windows delivers IMMNotificationClient callbacks on its own worker thread
+    and forbids calling back into the device API from inside them, so the
+    callback only signals (e.g. sets a threading.Event); the real work happens
+    on our worker thread.
+    """
+
+    def __init__(self, on_change) -> None:
+        self._on_change = on_change
+        self._client = None
+        self._enum = None
+
+    def start(self) -> bool:
+        try:
+            from pycaw.callbacks import MMNotificationClient
+
+            on_change = self._on_change
+
+            class _Client(MMNotificationClient):
+                def on_device_state_changed(self, device_id, new_state, new_state_id):
+                    on_change()
+
+                def on_device_added(self, added_device_id):
+                    on_change()
+
+                def on_device_removed(self, removed_device_id):
+                    on_change()
+
+                def on_default_device_changed(self, flow, flow_id, role, role_id, default_device_id):
+                    on_change()
+
+                def on_property_value_changed(self, device_id, property_struct, fmtid, pid):
+                    pass  # very chatty, not needed
+
+            self._enum = _enumerator()
+            self._client = _Client()
+            self._enum.RegisterEndpointNotificationCallback(self._client)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            log.warning("device change notifications unavailable, polling only: %r", exc)
+            self._client = None
+            return False
+
+    def stop(self) -> None:
+        if self._enum is not None and self._client is not None:
+            try:
+                self._enum.UnregisterEndpointNotificationCallback(self._client)
+            except Exception:  # noqa: BLE001
+                pass
+        self._client = None
+        self._enum = None

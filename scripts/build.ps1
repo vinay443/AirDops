@@ -8,5 +8,9 @@ python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt -r requirements-build.txt
 .\.venv\Scripts\python scripts\fetch_rnnoise.py
 .\.venv\Scripts\python scripts\make_icon.py
+.\.venv\Scripts\python scripts\make_version_info.py
 .\.venv\Scripts\pyinstaller --noconfirm --clean airdops.spec
-Write-Host "Built: dist\AirDops.exe"
+Write-Host "Built: dist\AirDops.exe (portable)"
+# Optional installer (needs Inno Setup 6):
+#   $env:AIRDOPS_ONEDIR=1; .\.venv\Scripts\pyinstaller --noconfirm airdops.spec
+#   & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\AirDops.iss

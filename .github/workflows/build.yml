@@ -61,9 +61,11 @@ jobs:
         run: python -m pip install -r requirements.txt -r requirements-build.txt
       - name: Fetch RNNoise (hash-verified)
         run: python scripts/fetch_rnnoise.py
-      - name: Generate icon
-        run: python scripts/make_icon.py
-      - name: Build AirDops.exe
+      - name: Generate icon and version info
+        run: |
+          python scripts/make_icon.py
+          python scripts/make_version_info.py
+      - name: Build AirDops.exe (portable)
         run: pyinstaller --noconfirm --clean airdops.spec
       - name: Smoke-test the built exe
         shell: pwsh
@@ -71,11 +73,30 @@ jobs:
           $p = Start-Process -FilePath dist\AirDops.exe -ArgumentList '--self-test', "$PWD\selftest.txt" -Wait -PassThru
           Get-Content selftest.txt
           if ($p.ExitCode -ne 0) { throw "self-test failed with exit code $($p.ExitCode)" }
+      - name: Build installer (per-user, no admin)
+        shell: pwsh
+        run: |
+          $env:AIRDOPS_ONEDIR = "1"
+          pyinstaller --noconfirm airdops.spec
+          $p = Start-Process -FilePath dist\AirDops\AirDops.exe -ArgumentList '--self-test', "$PWD\selftest-onedir.txt" -Wait -PassThru
+          Get-Content selftest-onedir.txt
+          if ($p.ExitCode -ne 0) { throw "onedir self-test failed" }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y | Out-Null
+          }
+          $ver = python -c "import sys; sys.path.insert(0, 'src'); import airdops; print(airdops.__version__)"
+          & $iscc /Qp "/DAppVersion=$ver" installer\AirDops.iss
+          if ($LASTEXITCODE -ne 0) { throw "installer build failed" }
+          Get-Item dist\AirDops-Setup.exe
       - name: Checksum
         shell: pwsh
         run: |
-          $h = (Get-FileHash dist\AirDops.exe -Algorithm SHA256).Hash.ToLower()
-          "$h  AirDops.exe" | Out-File -Encoding ascii dist\SHA256SUMS.txt
+          $lines = foreach ($f in 'AirDops.exe', 'AirDops-Setup.exe') {
+            $h = (Get-FileHash "dist\$f" -Algorithm SHA256).Hash.ToLower()
+            "$h  $f"
+          }
+          $lines | Out-File -Encoding ascii dist\SHA256SUMS.txt
           Get-Content dist\SHA256SUMS.txt
           Copy-Item selftest.txt dist\selftest.txt
           if (Test-Path previews) { Copy-Item -Recurse previews dist\previews }
@@ -84,6 +105,7 @@ jobs:
           name: AirDops-windows
           path: |
             dist/AirDops.exe
+            dist/AirDops-Setup.exe
             dist/SHA256SUMS.txt
             dist/selftest.txt
             dist/previews/
@@ -110,5 +132,5 @@ jobs:
           fi
           PRE=""
           case "$TAG" in *-*) PRE="--prerelease" ;; esac
-          gh release create "$TAG" dist/AirDops.exe dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/AirDops-Setup.exe dist/AirDops.exe dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --title "AirDops $TAG" --generate-notes --target "$GITHUB_SHA" $PRE

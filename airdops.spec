@@ -1,6 +1,12 @@
-# PyInstaller spec for AirDops.exe (one file, no console window).
-# Build: pyinstaller --noconfirm --clean airdops.spec
+# PyInstaller spec for AirDops.exe (no console window).
+#   pyinstaller --noconfirm --clean airdops.spec                -> dist/AirDops.exe (portable, one file)
+#   set AIRDOPS_ONEDIR=1 & pyinstaller --noconfirm airdops.spec -> dist/AirDops/ (folder, used by the installer;
+#                                                                  starts faster because nothing is unpacked)
+import os
+
 from PyInstaller.utils.hooks import collect_submodules
+
+ONEDIR = bool(os.environ.get("AIRDOPS_ONEDIR"))
 
 hidden = (
     collect_submodules("bleak")
@@ -28,15 +34,9 @@ a = Analysis(
     noarchive=False,
 )
 pyz = PYZ(a.pure)
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
-    [],
-    name="AirDops",
-    console=False,
-    icon="build/AirDops.ico",
-    upx=False,
-    version=None,
-)
+common = dict(name="AirDops", console=False, icon="build/AirDops.ico", upx=False, version="build/version_info.txt")
+if ONEDIR:
+    exe = EXE(pyz, a.scripts, [], exclude_binaries=True, **common)
+    coll = COLLECT(exe, a.binaries, a.datas, name="AirDops", upx=False)
+else:
+    exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], **common)

@@ -254,7 +254,11 @@ def self_test(out_path: str) -> int:
         endpoints.com_init()
         eps = endpoints.list_endpoints()
         endpoints._policy_config()  # interface must be creatable
-        return f"{len(eps)} endpoints"
+        watcher = endpoints.DeviceWatcher(lambda: None)
+        if not watcher.start():
+            raise AssertionError("device notifications could not be registered")
+        watcher.stop()
+        return f"{len(eps)} endpoints, notifications ok"
 
     def media_api() -> str:
         from . import media

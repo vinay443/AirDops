@@ -105,6 +105,11 @@ class Core:
         from .audio.endpoints import com_init, com_uninit
 
         com_init()
+        from .audio.endpoints import DeviceWatcher
+
+        watcher = DeviceWatcher(self._wake.set)
+        if watcher.start():
+            log.info("listening for audio device changes")
         try:
             while not self._stop.is_set():
                 try:
@@ -121,11 +126,15 @@ class Core:
                         self._paused_apps = []
                 except Exception:  # noqa: BLE001
                     log.exception("tick failed")
-                self._wake.wait(self.settings.poll_seconds)
+                # Device events wake us instantly (so the AirPods mic is blocked
+                # before apps can grab it); polling is the safety net.
+                if self._wake.wait(self.settings.poll_seconds):
+                    time.sleep(0.12)  # coalesce bursts of events
                 self._wake.clear()
             self.monitor.set_scanning(False)
             self.controller.restore_all()
         finally:
+            watcher.stop()
             com_uninit()
 
     # ------------------------------------------------------ notifications
