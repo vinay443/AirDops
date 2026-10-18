@@ -320,6 +320,10 @@ class Controller:
             self._was_connected = True
             return self.status
 
+    def mic_level(self) -> float:
+        p = self._pipeline
+        return float(getattr(p, "level", 0.0)) if p is not None else 0.0
+
     def available_mics(self) -> list[str]:
         """Names of microphones usable in Game mode (not the AirPods, not the cable)."""
         names = []

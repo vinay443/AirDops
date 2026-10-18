@@ -68,6 +68,10 @@ class Settings:
     # Ignore AirPods broadcasts weaker than this (filters out other people's AirPods).
     ble_min_rssi: int = -70
     poll_seconds: float = 2.0
+    # Global shortcut that flips Game/Call mode ("" disables it).
+    hotkey: str = "Ctrl+Alt+M"
+    # The welcome sheet has been shown.
+    onboarded: bool = False
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Settings":

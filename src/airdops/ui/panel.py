@@ -15,6 +15,8 @@ from .widgets import (
     BatteryTile,
     Group,
     Label,
+    LevelMeter,
+    Slider,
     P,
     PopupButton,
     Row,
@@ -33,7 +35,10 @@ class Actions(Protocol):
     def set_mode(self, mode: str) -> None: ...
     def set_setting(self, name: str, value: bool) -> None: ...
     def set_mic(self, name: str) -> None: ...
+    def set_gain(self, db: float) -> None: ...
+    def set_trigger(self, trigger: str) -> None: ...
     def open_bluetooth(self) -> None: ...
+    def open_sound(self) -> None: ...
     def open_vbcable(self) -> None: ...
     def diagnostics(self) -> None: ...
     def open_logs(self) -> None: ...
@@ -215,6 +220,22 @@ class Panel(QWidget):
         g = Group()
         self.mic_button = PopupButton(self._open_mic_menu)
         self.row_mic = g.add(Row("Input", accessory=self.mic_button))
+        self.meter = LevelMeter()
+        self.row_level = g.add(Row("Input Level", accessory=self.meter))
+        boost = QWidget()
+        bl2 = QHBoxLayout(boost)
+        bl2.setContentsMargins(0, 0, 0, 0)
+        bl2.setSpacing(8)
+        self.boost = Slider(-6, 18, 1)
+        self.boost.setFixedWidth(118)
+        self.boost_label = Label("0 dB", 12, QFont.Weight.Medium, role="secondary")
+        self.boost_label.setFixedWidth(44)
+        self.boost_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        bl2.addWidget(self.boost)
+        bl2.addWidget(self.boost_label)
+        self.boost.valueChanged.connect(self._boost_preview)
+        self.boost.released.connect(lambda v: self.actions.set_gain(float(v)))
+        self.row_boost = g.add(Row("Mic Boost", accessory=boost))
         self.sw_ns = Switch()
         self.row_ns = g.add(Row("Noise Suppression", "Removes keyboard and fan noise", self.sw_ns))
         self.sw_gate = Switch()
@@ -234,6 +255,8 @@ class Panel(QWidget):
         g2.add(Row("Keep Game Volume", "No ducking during voice chat", self.sw_duck))
         self.sw_ear = Switch()
         g2.add(Row("Automatic Ear Detection", "Pauses when an AirPod comes out", self.sw_ear))
+        self.trigger_button = PopupButton(self._open_trigger_menu)
+        self.row_trigger = g2.add(Row("Pause When", accessory=self.trigger_button))
         self.sw_batt = Switch()
         g2.add(Row("Low Battery Alerts", "", self.sw_batt))
         self.sw_login = Switch()
@@ -295,9 +318,30 @@ class Panel(QWidget):
             a.triggered.connect(lambda _=False, n=name: self.actions.set_mic(n))
         self._exec_menu(m, button.mapToGlobal(QPoint(0, button.height() + 4)))
 
+    def _boost_preview(self, v: float) -> None:
+        self.boost_label.setText(f"{v:+.0f} dB" if v else "0 dB")
+
+    def update_level(self, level: float) -> None:
+        if self.isVisible() and not self.row_level.isHidden():
+            self.meter.set_level(level)
+
+    def _open_trigger_menu(self, button: PopupButton) -> None:
+        st = self.state
+        m = styled_menu(self)
+        for key, text in (("one", "Either AirPod Is Removed"), ("both", "Both AirPods Are Removed")):
+            a = m.addAction(text)
+            a.setCheckable(True)
+            a.setChecked(bool(st) and st.auto_pause_trigger == key)
+            a.triggered.connect(lambda _=False, k=key: self.actions.set_trigger(k))
+        self._exec_menu(m, button.mapToGlobal(QPoint(0, button.height() + 4)))
+
     def _open_more(self, anchor: QWidget) -> None:
         m = styled_menu(self)
         m.addAction("Bluetooth Settings…", self.actions.open_bluetooth)
+        m.addAction("Sound Settings…", self.actions.open_sound)
+        if self.state and self.state.hotkey:
+            hk = m.addAction(f"Switch Game/Call Mode:  {self.state.hotkey}")
+            hk.setEnabled(False)
         m.addSeparator()
         m.addAction("Run Diagnostics", self.actions.diagnostics)
         m.addAction("Open Log Folder", self.actions.open_logs)
@@ -351,11 +395,19 @@ class Panel(QWidget):
         if st.connected and game and st.noise_suppression and st.ns_active:
             ns_sub = "On · cleaning up your voice"
         self.row_ns.set_subtitle(ns_sub)
+        live = st.connected and game and st.ns_active
+        self.row_level.setVisible(live)
+        self.row_boost.setVisible(live)
+        if not self.boost._drag:
+            self.boost.set_value(st.mic_gain_db)
+            self._boost_preview(st.mic_gain_db)
         self.sw_gate.setChecked(st.voice_gate)
         self.row_gate.setEnabled(game and st.cable_installed and st.noise_suppression)
         self.cable_link.setVisible(not st.cable_installed)
         self.sw_duck.setChecked(st.prevent_ducking)
         self.sw_ear.setChecked(st.auto_pause)
+        self.row_trigger.setVisible(st.auto_pause)
+        self.trigger_button.setText("Either AirPod Is Removed" if st.auto_pause_trigger == "one" else "Both Are Removed")
         self.sw_batt.setChecked(st.battery_notifications)
         self.sw_login.setChecked(st.start_with_windows)
         self.version.setText(f"AirDops {st.version}")

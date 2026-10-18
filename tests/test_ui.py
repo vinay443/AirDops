@@ -27,7 +27,7 @@ class Recorder:
 
 def test_renders_every_screen(app, tmp_path):
     paths = render_all(tmp_path)
-    assert len(paths) == 8
+    assert len(paths) == 10
     for p in paths:
         assert p.stat().st_size > 5000
 
@@ -79,3 +79,34 @@ def test_view_state_text():
     assert "can't switch" in st.mode_caption()
     assert ViewState().status_line() == "Not Connected"
     assert ViewState(left=40, right=20).lowest == 20
+
+
+def test_hotkey_parse():
+    from airdops.ui.hotkey import MOD_ALT, MOD_CONTROL, MOD_SHIFT, parse
+
+    assert parse("Ctrl+Alt+M") == (MOD_CONTROL | MOD_ALT, ord("M"))
+    assert parse("ctrl + shift + f9") == (MOD_CONTROL | MOD_SHIFT, 0x78)
+    assert parse("Shift+M") is None  # would steal normal typing
+    assert parse("M") is None
+    assert parse("") is None
+    assert parse("Ctrl+Alt+Space") is None
+
+
+def test_welcome_and_new_rows(app):
+    from airdops.ui.panel import Panel
+    from airdops.ui.welcome import Welcome
+
+    done = []
+    w = Welcome(True, done.append, lambda: None)
+    w.sw_login.setChecked(False)
+    w._finish()
+    assert done == [False]
+
+    rec = Recorder()
+    panel = Panel(rec)
+    panel.set_state(CONNECTED)
+    assert not panel.row_level.isHidden() and not panel.row_boost.isHidden()
+    panel.boost.released.emit(9.0)
+    assert ("set_gain", 9.0) in rec.calls
+    panel.set_state(DISCONNECTED)
+    assert panel.row_level.isHidden()

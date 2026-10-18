@@ -87,6 +87,16 @@ class Shell:
         self.timer = QTimer()
         self.timer.setInterval(350)
         self.timer.timeout.connect(self._refresh)
+        # Fast timer just for the live mic meter while the panel is open.
+        self.meter_timer = QTimer()
+        self.meter_timer.setInterval(50)
+        self.meter_timer.timeout.connect(self._tick_meter)
+        self._banners: list[tuple[str, str]] = []
+        self.welcome = None
+
+        from .hotkey import GlobalHotkey
+
+        self.hotkey = GlobalHotkey(self._on_hotkey)
 
     # --------------------------------------------------------- actions (Panel)
     def set_mode(self, mode: str) -> None:
@@ -100,6 +110,18 @@ class Shell:
     def set_mic(self, name: str) -> None:
         self.core.set_mic(name)
         self._refresh()
+
+    def set_gain(self, db: float) -> None:
+        self.core.set_gain(db)
+        self._refresh()
+
+    def set_trigger(self, trigger: str) -> None:
+        self.core.set_trigger(trigger)
+        self._refresh()
+
+    def open_sound(self) -> None:
+        self.panel.hide()
+        self.core.open_sound()
 
     def open_bluetooth(self) -> None:
         self.panel.hide()
@@ -126,6 +148,8 @@ class Shell:
         self.core.restore()
 
     def quit(self) -> None:
+        self.hotkey.unregister()
+        self.meter_timer.stop()
         self.panel.hide()
         self.toast.hide()
         self.timer.stop()
@@ -234,8 +258,16 @@ class Shell:
             if not self.panel.isVisible():
                 self.toast.popup(st)
 
-        for title, msg in self.core.pop_notifications():
-            self.tray.showMessage(title, msg, app_icon(), 6000)
+        # Alerts use the same Apple-style banner, one at a time.
+        self._banners.extend(self.core.pop_notifications())
+        if self._banners and not self.toast.isVisible() and self._toast_due is None:
+            title, msg = self._banners.pop(0)
+            self.toast.popup(st, title, msg, ms=6000)
+        if self.panel.isVisible() != self.meter_timer.isActive():
+            if self.panel.isVisible():
+                self.meter_timer.start()
+            else:
+                self.meter_timer.stop()
         self._last = st
 
     @staticmethod
@@ -251,15 +283,50 @@ class Shell:
                 line += "\n" + "  ".join(b for b in bits if b)
         return line
 
+    def _tick_meter(self) -> None:
+        try:
+            self.panel.update_level(self.core.mic_level())
+        except Exception:  # noqa: BLE001
+            self.meter_timer.stop()
+
+    def _on_hotkey(self) -> None:
+        mode = self.core.toggle_mode()
+        st = self.core.snapshot()
+        self.toast.popup(
+            st,
+            "Game Mode" if mode == "game" else "Call Mode",
+            "Full-quality sound · laptop mic" if mode == "game" else "Using the AirPods microphone",
+            ms=2200,
+        )
+        self._refresh()
+
+    def _show_welcome(self) -> None:
+        from .welcome import Welcome
+
+        st = self.core.snapshot()
+
+        def done(open_at_login: bool) -> None:
+            self.core.finish_onboarding(open_at_login)
+            self.welcome = None
+            self._open_panel()
+
+        self.welcome = Welcome(st.cable_installed, done, self.core.open_vbcable)
+        self.welcome.present()
+
     # ---------------------------------------------------------------- run
     def run(self) -> int:
         self.core.start()
         self.tray.show()
         self.timer.start()
-        if not self.background:
-            welcome = ViewState(name="AirDops is running", mode=self.core.settings.mode)
+        hk = getattr(self.core.settings, "hotkey", "")
+        if hk:
+            self.hotkey.register(hk)
+        if not getattr(self.core.settings, "onboarded", True):
+            QTimer.singleShot(700, self._show_welcome)
+        elif not self.background:
+            running = ViewState(name="AirDops is running", mode=self.core.settings.mode)
             QTimer.singleShot(
-                900, lambda: self.toast.popup(welcome, "AirDops is running", "Click the AirPods icon in the tray")
+                900, lambda: self.toast.popup(running, "AirDops is running", "Click the AirPods icon in the tray")
             )
         log.info("UI started")
         return self.app.exec()

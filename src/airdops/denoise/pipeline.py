@@ -61,6 +61,7 @@ class NoisePipeline:
         self._lock = threading.Lock()
         self._status_count = 0
         self.last_voice_prob = 0.0
+        self.level = 0.0  # 0..1, output loudness for the UI meter
 
     @property
     def running(self) -> bool:
@@ -93,6 +94,9 @@ class NoisePipeline:
             out *= self.gain
         np.clip(out, -1.0, 1.0, out=out)
         outdata[:] = out[:, None]
+        rms = float(np.sqrt(np.mean(out * out))) if frames else 0.0
+        db = 20.0 * np.log10(rms + 1e-9)
+        self.level = max(0.0, min(1.0, (db + 60.0) / 54.0))  # -60 dBFS..-6 dBFS -> 0..1
 
     def start(self) -> None:
         import sounddevice as sd

@@ -498,3 +498,197 @@ class StatusDot(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(getattr(P(), self.role))
         p.drawEllipse(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5))
+
+
+# ------------------------------------------------------------------ slider
+class Slider(QWidget):
+    """macOS-style slider: thin rounded track, accent fill, white shadowed knob."""
+
+    valueChanged = Signal(float)  # emitted while dragging
+    released = Signal(float)  # emitted once when the drag ends
+
+    def __init__(self, minimum: float, maximum: float, step: float = 1.0) -> None:
+        super().__init__()
+        self.minimum, self.maximum, self.step = minimum, maximum, step
+        self.value = minimum
+        self._drag = False
+        self.setFixedHeight(24)
+        self.setMinimumWidth(120)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+    def set_value(self, v: float) -> None:
+        v = max(self.minimum, min(self.maximum, v))
+        if v != self.value:
+            self.value = v
+            self.update()
+
+    def _knob_d(self) -> float:
+        return 20.0
+
+    def _value_at(self, x: float) -> float:
+        d = self._knob_d()
+        frac = (x - d / 2) / max(1.0, self.width() - d)
+        v = self.minimum + max(0.0, min(1.0, frac)) * (self.maximum - self.minimum)
+        return round(v / self.step) * self.step
+
+    def mousePressEvent(self, e) -> None:  # noqa: N802
+        if not self.isEnabled():
+            return
+        self._drag = True
+        self._move_to(e.position().x())
+
+    def mouseMoveEvent(self, e) -> None:  # noqa: N802
+        if self._drag:
+            self._move_to(e.position().x())
+
+    def mouseReleaseEvent(self, e) -> None:  # noqa: N802
+        if self._drag:
+            self._drag = False
+            self.released.emit(self.value)
+
+    def _move_to(self, x: float) -> None:
+        v = self._value_at(x)
+        if v != self.value:
+            self.value = v
+            self.update()
+            self.valueChanged.emit(v)
+
+    def wheelEvent(self, e) -> None:  # noqa: N802
+        delta = self.step if e.angleDelta().y() > 0 else -self.step
+        old = self.value
+        self.set_value(self.value + delta)
+        if self.value != old:
+            self.valueChanged.emit(self.value)
+            self.released.emit(self.value)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        pal = P()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.isEnabled():
+            p.setOpacity(0.45)
+        d = self._knob_d()
+        cy = self.height() / 2
+        track = QRectF(d / 2, cy - 2, self.width() - d, 4)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(pal.fill_strong)
+        p.drawRoundedRect(track, 2, 2)
+        frac = (self.value - self.minimum) / max(1e-9, self.maximum - self.minimum)
+        x = track.left() + track.width() * frac
+        p.setBrush(pal.accent)
+        p.drawRoundedRect(QRectF(track.left(), track.top(), x - track.left(), track.height()), 2, 2)
+        knob = QRectF(x - d / 2, cy - d / 2, d, d)
+        _soft_shadow(p, knob, d / 2, alpha=70, spread=3)
+        p.setBrush(pal.knob)
+        p.setPen(QPen(QColor(0, 0, 0, 25), 0.6))
+        p.drawEllipse(knob)
+
+
+# ------------------------------------------------------------- level meter
+class LevelMeter(QWidget):
+    """Input level as a row of rounded bars (like macOS Sound settings)."""
+
+    BARS = 14
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.level = 0.0  # 0..1
+        self._peak = 0.0
+        self.setFixedSize(150, 14)
+
+    def set_level(self, level: float) -> None:
+        level = max(0.0, min(1.0, level))
+        # fast attack, slow release, like a VU meter
+        self.level = level if level > self.level else self.level * 0.80 + level * 0.20
+        self._peak = max(self._peak * 0.97, self.level)
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        pal = P()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        gap = 3.0
+        w = (self.width() - gap * (self.BARS - 1)) / self.BARS
+        lit = int(round(self.level * self.BARS))
+        peak = min(self.BARS - 1, int(self._peak * self.BARS))
+        for i in range(self.BARS):
+            r = QRectF(i * (w + gap), 2, w, self.height() - 4)
+            if i < lit or (i == peak and self._peak > 0.05):
+                color = pal.green if i < self.BARS * 0.75 else (pal.orange if i < self.BARS - 1 else pal.red)
+            else:
+                color = pal.fill_strong
+            p.setBrush(color)
+            p.drawRoundedRect(r, w / 2.5, w / 2.5)
+
+
+class PrimaryButton(QAbstractButton):
+    """Filled accent pill button (default button in a macOS sheet)."""
+
+    def __init__(self, text: str) -> None:
+        super().__init__()
+        self.setText(text)
+        self._font = theme.font(14, QFont.Weight.DemiBold)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setFixedHeight(38)
+        self.setMinimumWidth(200)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        pal = P()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(pal.accent)
+        if self.isDown():
+            color = color.darker(115)
+        elif self.underMouse():
+            color = color.lighter(108)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(color)
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
+        p.setPen(QColor("#FFFFFF"))
+        p.setFont(self._font)
+        p.drawText(r, Qt.AlignmentFlag.AlignCenter, self.text())
+
+
+class Badge(QWidget):
+    """Coloured circle with a white glyph, like an iOS Settings icon."""
+
+    def __init__(self, role: str, glyph: str, size: int = 34) -> None:
+        super().__init__()
+        self.role = role
+        self.glyph = glyph
+        self.setFixedSize(size, size)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        pal = P()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(getattr(pal, self.role))
+        p.drawRoundedRect(r, r.width() * 0.28, r.width() * 0.28)
+        white = QColor("#FFFFFF")
+        c = r.center()
+        s = r.width()
+        if self.glyph == "buds":
+            art.glyph_bud(p, QRectF(c.x() - s * 0.30, c.y() - s * 0.26, s * 0.26, s * 0.52), white, True)
+            art.glyph_bud(p, QRectF(c.x() + s * 0.04, c.y() - s * 0.26, s * 0.26, s * 0.52), white, False)
+        elif self.glyph == "mic":
+            p.setBrush(white)
+            p.drawRoundedRect(QRectF(c.x() - s * 0.11, c.y() - s * 0.28, s * 0.22, s * 0.36), s * 0.11, s * 0.11)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(white, s * 0.06, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawArc(QRectF(c.x() - s * 0.20, c.y() - s * 0.16, s * 0.40, s * 0.34), 180 * 16, 180 * 16)
+            p.drawLine(QPointF(c.x(), c.y() + s * 0.18), QPointF(c.x(), c.y() + s * 0.28))
+        elif self.glyph == "wave":
+            p.setPen(QPen(white, s * 0.07, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            for i, h in enumerate((0.16, 0.34, 0.22, 0.40, 0.18)):
+                x = c.x() + (i - 2) * s * 0.12
+                p.drawLine(QPointF(x, c.y() - s * h / 2), QPointF(x, c.y() + s * h / 2))
+        elif self.glyph == "power":
+            p.setPen(QPen(white, s * 0.07, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawArc(QRectF(c.x() - s * 0.22, c.y() - s * 0.20, s * 0.44, s * 0.44), 120 * 16, 300 * 16)
+            p.drawLine(QPointF(c.x(), c.y() - s * 0.28), QPointF(c.x(), c.y() - s * 0.04))

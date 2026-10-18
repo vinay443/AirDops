@@ -187,6 +187,9 @@ class Core:
             note=st.note,
             noise_suppression=s.noise_suppression,
             voice_gate=s.voice_gate,
+            mic_gain_db=s.mic_gain_db,
+            auto_pause_trigger=s.auto_pause_trigger,
+            hotkey=s.hotkey,
             prevent_ducking=s.prevent_ducking,
             auto_pause=s.auto_pause,
             battery_notifications=s.battery_notifications,
@@ -215,6 +218,31 @@ class Core:
         setattr(self.settings, name, bool(value))
         self._changed()
 
+    def set_gain(self, db: float) -> None:
+        self.settings.mic_gain_db = max(-12.0, min(24.0, float(db)))
+        config.save_settings(self.settings)
+        self.controller.settings_changed()
+        self._wake.set()
+
+    def set_trigger(self, trigger: str) -> None:
+        if trigger in ("one", "both"):
+            self.settings.auto_pause_trigger = trigger
+            self.ear.trigger = trigger
+            config.save_settings(self.settings)
+
+    def mic_level(self) -> float:
+        return self.controller.mic_level()
+
+    def finish_onboarding(self, open_at_login: bool) -> None:
+        self.settings.onboarded = True
+        config.save_settings(self.settings)
+        self.set_setting("start_with_windows", open_at_login)
+
+    def toggle_mode(self) -> str:
+        new = CALL if self.settings.mode == GAME else GAME
+        self.set_mode(new)
+        return new
+
     def set_mic(self, name: str) -> None:
         self.settings.preferred_mic = name
         self._changed()
@@ -236,6 +264,9 @@ class Core:
 
     def open_bluetooth(self) -> None:
         _open("ms-settings:bluetooth")
+
+    def open_sound(self) -> None:
+        _open("ms-settings:sound")
 
     def open_vbcable(self) -> None:
         _open(VBCABLE_URL)

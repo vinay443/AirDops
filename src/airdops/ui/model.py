@@ -31,6 +31,9 @@ class ViewState:
     # settings
     noise_suppression: bool = True
     voice_gate: bool = False
+    mic_gain_db: float = 0.0
+    auto_pause_trigger: str = "one"
+    hotkey: str = "Ctrl+Alt+M"
     prevent_ducking: bool = True
     auto_pause: bool = True
     battery_notifications: bool = True

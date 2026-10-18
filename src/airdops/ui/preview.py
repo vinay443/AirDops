@@ -21,6 +21,7 @@ CONNECTED = ViewState(
     left_in_ear=True,
     right_in_ear=True,
     mic_name="Microphone Array",
+    mic_gain_db=6.0,
     mics=("Microphone Array (Intel® Smart Sound Technology)", "Microphone (Blue Yeti)"),
     cable_installed=True,
     ns_active=True,
@@ -73,6 +74,19 @@ def render_all(out: Path) -> list[Path]:
             path = out / f"panel-{name}-{tag}.png"
             bg.save(str(path))
             paths.append(path)
+        from airdops.ui.welcome import Welcome
+
+        w = Welcome(cable_installed=False, on_done=lambda _o: None, on_get_cable=lambda: None)
+        w.adjustSize()
+        img = w.grab().toImage()
+        bg = QImage(img.size(), QImage.Format.Format_ARGB32_Premultiplied)
+        bg.fill(QColor("#7A8AA0") if pal.dark else QColor("#C9D3E0"))
+        p = QPainter(bg)
+        p.drawImage(0, 0, img)
+        p.end()
+        path = out / f"welcome-{tag}.png"
+        bg.save(str(path))
+        paths.append(path)
         toast = Toast()
         toast.set_state(CONNECTED)
         img = _shoot(toast)
