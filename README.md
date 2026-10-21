@@ -102,6 +102,32 @@ between Apple devices, Conversation Awareness and firmware updates. These rely
 on Apple's private protocol, which Windows' Bluetooth stack doesn't expose to
 apps.
 
+## Size and speed
+
+v0.4 cut the download by more than half: RNNoise is now built from Xiph's
+source with its compact 8-bit model (3.6 MB instead of 14 MB, same output:
+see `tests/test_rnnoise_quality.py`), NumPy is replaced by a tiny C helper,
+and unused parts of Qt, OpenSSL and the C runtime are left out.
+
+| Download | v0.3.0-beta.1 | v0.4.0-beta.1 |
+|---|---|---|
+| `AirDops-Setup.exe` | 52.5 MB | 21.6 MB |
+| Portable | 70.4 MB (`AirDops.exe`) | 26.6 MB (`AirDops-portable.zip`) |
+
+Measured by `AirDops.exe --bench report.txt` on GitHub's Windows build
+machine (no AirPods attached), installed folder build:
+
+| | v0.3.0-beta.1 build | v0.4.0-beta.1 |
+|---|---|---|
+| Launch to tray icon, first / second launch | 1.79 s / 0.59 s | 1.04 s / 0.57 s |
+| CPU while idle in the tray | ≈0.1% of one core | ≈0.1% of one core (now wakes every 2 s, not every 0.35 s) |
+| CPU with the panel open | 0.9–1.6% | 0.9–1.3% (the 50 ms level meter only runs while noise suppression is live) |
+| Memory while idle (working set / private) | 80 MB / 41 MB | 79 MB / 40 MB |
+| Noise suppression, per 10 ms of audio | — | 0.25 ms (about 2.5% of one core) |
+
+Most of the remaining size and memory is Qt and Python themselves. CI fails
+if `AirDops-Setup.exe` grows past 21 MiB (`scripts/size_report.py`).
+
 ## Testing
 
 See [TESTING.md](TESTING.md) for a 15-minute checklist with real AirPods.

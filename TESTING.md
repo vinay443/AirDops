@@ -49,6 +49,9 @@ If anything fails, open the panel, choose **More → Run Diagnostics**, and atta
 - [ ] Choose **Call Mode**: the pill slides over, the AirPods mic is re-enabled and becomes the default input. Audio drops to call quality while the mic is in use, which is expected.
 - [ ] Back to **Game Mode**: the AirPods mic is disabled again.
 
+## 6b. Speed (optional)
+- [ ] Quit AirDops, then run `AirDops.exe --bench %TEMP%\airdops-bench.txt` from the install folder (`%LOCALAPPDATA%\Programs\AirDops`). It runs for about 45 seconds and writes startup time, CPU and memory to that file. Share it to compare with the numbers in the README.
+
 ## 7. Undo
 - [ ] **Quit**: the AirPods mic is re-enabled, your normal mic is the default again, and ducking is back to what it was.
 - [ ] **Open at Login**: turn it on, sign out and back in, and AirDops starts quietly in the tray.

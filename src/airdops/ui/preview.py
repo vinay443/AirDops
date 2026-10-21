@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from PySide6.QtGui import QColor, QImage, QPainter
 
+from .. import __version__
 from . import theme, widgets
 from .model import ViewState
+
+VERSION = re.match(r"\d+\.\d+\.\d+", __version__).group(0)  # "0.4.0b1" -> "0.4.0"
 
 CONNECTED = ViewState(
     connected=True,
@@ -26,9 +30,9 @@ CONNECTED = ViewState(
     cable_installed=True,
     ns_active=True,
     hfp_blocked=True,
-    version="0.3.0",
+    version=VERSION,
 )
-DISCONNECTED = ViewState(connected=False, name="AirPods", cable_installed=False, version="0.3.0")
+DISCONNECTED = ViewState(connected=False, name="AirPods", cable_installed=False, version=VERSION)
 CALL = ViewState(
     connected=True,
     name="AirPods Pro 2",
@@ -39,7 +43,7 @@ CALL = ViewState(
     case=None,
     mic_name="AirPods Pro 2 mic",
     cable_installed=True,
-    version="0.3.0",
+    version=VERSION,
 )
 
 

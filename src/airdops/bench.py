@@ -19,8 +19,9 @@ import time
 from ctypes import wintypes
 from pathlib import Path
 
-IDLE_SECONDS = 20.0
-PANEL_SECONDS = 5.0
+IDLE_SECONDS = 30.0
+PANEL_SETTLE_SECONDS = 1.5  # let the fade-in finish first
+PANEL_SECONDS = 10.0
 
 
 class _MemCounters(ctypes.Structure):
@@ -113,8 +114,11 @@ def run(report: str) -> int:
     def idle_end() -> None:
         dt = time.perf_counter() - state["t0"]
         cpu = process_times()[1] - state["cpu0"]
-        add(f"idle CPU: {cpu / dt * 100:.2f}% of one core over {dt:.0f} s")
+        add(f"idle CPU: {cpu / dt * 100:.2f}% of one core over {dt:.0f} s (Windows counts CPU time in 15.6 ms steps)")
         shell._open_panel()
+        QTimer.singleShot(int(PANEL_SETTLE_SECONDS * 1000), panel_start)
+
+    def panel_start() -> None:
         state["t1"], state["cpu1"] = time.perf_counter(), process_times()[1]
         QTimer.singleShot(int(PANEL_SECONDS * 1000), panel_end)
 
