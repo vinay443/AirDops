@@ -1,6 +1,6 @@
 """Print what makes up the AirDops download and enforce a size budget (CI).
 
-Usage:  python scripts/size_report.py dist/AirDops dist/AirDops-Setup.exe dist/AirDops-portable.zip
+Usage:  python scripts/size_report.py [--warn-only] dist/AirDops dist/AirDops-Setup.exe dist/AirDops-portable.zip
 
 Lists the biggest bundled files, then the size of each download. Exits with 1
 if a download is over its budget, so a dependency that bloats the bundle fails
@@ -28,6 +28,8 @@ def human(n: int) -> str:
 
 
 def main(args: list[str]) -> int:
+    warn_only = "--warn-only" in args
+    args = [a for a in args if a != "--warn-only"]
     lines: list[str] = []
     over: list[str] = []
     for arg in args:
@@ -64,9 +66,10 @@ def main(args: list[str]) -> int:
         biggest = [line.strip() for line in lines if line.startswith("  ")]
         if biggest:
             print("::notice title=Biggest bundled files::" + "%0A".join(biggest))
+        level = "warning" if warn_only else "error"
         for name in over:
-            print(f"::error title=Size budget::{name} is over its size budget (see scripts/size_report.py)")
-    return 1 if over else 0
+            print(f"::{level} title=Size budget::{name} is over its size budget (see scripts/size_report.py)")
+    return 1 if over and not warn_only else 0
 
 
 if __name__ == "__main__":
