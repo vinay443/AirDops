@@ -53,6 +53,13 @@ SOURCES = [
     "src/rnnoise_tables.c",
 ]
 DEFINES = ["NDEBUG", "DISABLE_DEBUG_FLOAT", "RNNOISE_BUILD", "DLL_EXPORT", "_USE_MATH_DEFINES"]
+# rnnoise.h only exports on Windows when WIN32 (no underscore) is defined, which
+# clang doesn't do, so set the export attribute directly.
+WIN_DEFINES = ["RNNOISE_EXPORT=__declspec(dllexport)"]
+REQUIRED_SYMBOLS = (
+    "rnnoise_create", "rnnoise_destroy", "rnnoise_process_frame", "rnnoise_get_frame_size",
+    "airdops_denoise", "airdops_finish",
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 VENDOR = ROOT / "src" / "airdops" / "_vendor"
@@ -135,14 +142,14 @@ def compile_library(src: Path, out: Path) -> None:
         if clang:
             # Static CRT (/MT equivalent) so the DLL has no runtime dependencies of its own.
             cmd = [clang, "-O2", "-shared", "-fms-runtime-lib=static", "-Wno-deprecated-declarations", "-o", str(out)]
-            cmd += [f"-D{d}" for d in DEFINES] + [f"-I{i}" for i in incs] + files
+            cmd += [f"-D{d}" for d in DEFINES + WIN_DEFINES] + [f"-I{i}" for i in incs] + files
             run(cmd)
         else:
             bat = _vcvars()
             if bat is None:
                 raise SystemExit("no C compiler found (install LLVM clang or Visual Studio Build Tools)")
             cl = ["cl", "/nologo", "/O2", "/MT", "/LD", "/std:c11", f"/Fe{out}", f"/Fo{out.parent}\\"]
-            cl += [f"/D{d}" for d in DEFINES] + [f"/I{i}" for i in incs] + files
+            cl += [f"/D{d}" for d in DEFINES + WIN_DEFINES] + [f"/I{i}" for i in incs] + files
             run(["cmd", "/c", f'call "{bat}" >nul && ' + subprocess.list2cmdline(cl)])
         for leftover in (out.with_suffix(".lib"), out.with_suffix(".exp")):
             leftover.unlink(missing_ok=True)
@@ -151,6 +158,17 @@ def compile_library(src: Path, out: Path) -> None:
         cmd = [cc, "-O2", "-fPIC", "-shared", "-fvisibility=hidden", "-s", "-o", str(out)]
         cmd += [f"-D{d}" for d in DEFINES] + [f"-I{i}" for i in incs] + files + ["-lm"]
         run(cmd)
+
+
+def check_exports(path: Path) -> None:
+    import ctypes
+
+    lib = ctypes.CDLL(str(path.resolve()))
+    missing = [name for name in REQUIRED_SYMBOLS if not hasattr(lib, name)]
+    if missing:
+        raise SystemExit(f"{path.name} does not export {missing}")
+    if lib.rnnoise_get_frame_size() != 480:
+        raise SystemExit("unexpected RNNoise frame size")
 
 
 def main() -> int:
@@ -167,6 +185,7 @@ def main() -> int:
     else:
         fetch_model(src)
     compile_library(src, args.out)
+    check_exports(args.out)
     VENDOR.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src / "COPYING", VENDOR / "rnnoise-COPYING.txt")
     data = args.out.read_bytes()
