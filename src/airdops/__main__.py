@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--diagnose", action="store_true", help="write a diagnostics report and open it")
     parser.add_argument("--restore", action="store_true", help="undo every change AirDops made, then exit")
     parser.add_argument("--self-test", metavar="REPORT", help="(CI) check the build and write a report")
+    parser.add_argument("--bench", metavar="REPORT", help="measure startup time, idle CPU and memory, write a report")
     parser.add_argument("--uninstall", action="store_true", help="(installer) restore audio and remove the login item")
     parser.add_argument("--quiet", action="store_true", help="no message boxes (used by the uninstaller)")
     parser.add_argument("--verbose", action="store_true", help="debug logging")
@@ -114,6 +115,11 @@ def main(argv: list[str] | None = None) -> int:
             if not signal_running_instance():
                 _message_box("AirDops is already running - click the AirPods icon in the system tray.")
         return 0
+
+    if args.bench:
+        from .bench import run as bench
+
+        return bench(args.bench)
 
     if args.uninstall:
         args.restore = True

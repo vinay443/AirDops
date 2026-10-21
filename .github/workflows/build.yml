@@ -86,6 +86,14 @@ jobs:
           Get-Content selftest.txt
           Get-Content selftest.txt | ForEach-Object { "::notice title=Self-test::$_" }
           if ($p.ExitCode -ne 0) { throw "self-test failed with exit code $($p.ExitCode)" }
+      - name: Measure startup, idle CPU and memory (two runs; the second is warm)
+        shell: pwsh
+        run: |
+          foreach ($i in 1, 2) {
+            $p = Start-Process -FilePath dist\AirDops\AirDops.exe -ArgumentList '--bench', "$PWD\bench$i.txt" -Wait -PassThru
+            if ($p.ExitCode -ne 0 -or -not (Test-Path "bench$i.txt")) { throw "bench run $i failed ($($p.ExitCode))" }
+            Get-Content "bench$i.txt" | ForEach-Object { "::notice title=Bench run $i::$_" }
+          }
       - name: Portable zip
         shell: pwsh
         run: |
