@@ -34,8 +34,9 @@ and only while your AirPods are connected:
 
 1. From [Releases](../../releases), download **`AirDops-Setup.exe`** (recommended:
    installs for your user only with no admin prompt, adds a Start menu entry,
-   starts faster, and the uninstaller puts your Windows audio back) or the
-   portable **`AirDops.exe`** (single file, nothing installed).
+   and the uninstaller puts your Windows audio back) or
+   **`AirDops-portable.zip`** (unzip anywhere and run `AirDops.exe` inside;
+   nothing installed).
    Check either against `SHA256SUMS.txt` if you like: `Get-FileHash AirDops-Setup.exe`.
 2. Run it. Windows SmartScreen may warn because the files aren't code-signed
    (signing certificates cost money). Choose *More info → Run anyway*. The
@@ -130,11 +131,13 @@ on your PC. See [SECURITY.md](SECURITY.md) for the details.
 ```powershell
 git clone https://github.com/vinay443/AirDops.git
 cd AirDops
-powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # -> dist\AirDops.exe
+powershell -ExecutionPolicy Bypass -File scripts\build.ps1   # -> dist\AirDops\AirDops.exe
 ```
 
 Or run without building: `pip install -r requirements.txt`,
-`python scripts\fetch_rnnoise.py`, then `python -m airdops` from `src`.
+`python scripts\build_rnnoise.py` (needs a C compiler: LLVM clang or Visual
+Studio Build Tools; it builds RNNoise from pinned Xiph source), then
+`python -m airdops` from `src`.
 Tests: `pip install -r requirements-dev.txt` then `python -m pytest`.
 
 ### How it works

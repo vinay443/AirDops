@@ -4,18 +4,17 @@ AirDops bundles or depends on the following open-source components.
 
 | Component | License | Use |
 |---|---|---|
-| [RNNoise](https://github.com/xiph/rnnoise) (Xiph.Org Foundation, Jean-Marc Valin) | BSD-3-Clause | Neural noise suppression |
-| [pyrnnoise](https://github.com/pengzhendong/pyrnnoise) build of RNNoise (`rnnoise.dll`) | Apache-2.0 (bundled as `pyrnnoise-LICENSE.txt`) | Prebuilt Windows DLL |
+| [RNNoise](https://github.com/xiph/rnnoise) (Xiph.Org Foundation, Jean-Marc Valin, and the Opus DNN code it includes) | BSD-3-Clause (bundled as `rnnoise-COPYING.txt`) | Neural noise suppression. `rnnoise.dll` is built from pinned Xiph source and model by `scripts/build_rnnoise.py`. |
 | [bleak](https://github.com/hbldh/bleak) | MIT | Bluetooth LE scanning |
 | [pywinrt](https://github.com/pywinrt/pywinrt) (`winrt-*`) | MIT | Windows Runtime (media sessions, Bluetooth) |
 | [pycaw](https://github.com/AndreMiras/pycaw) | MIT | Windows Core Audio interfaces |
 | [comtypes](https://github.com/enthought/comtypes) | MIT | COM support |
-| [psutil](https://github.com/giampaolo/psutil) | BSD-3-Clause | Dependency of pycaw |
+| [psutil](https://github.com/giampaolo/psutil) | BSD-3-Clause | Install-time dependency of pycaw (not bundled) |
 | [python-sounddevice](https://github.com/spatialaudio/python-sounddevice) / PortAudio | MIT | Real-time audio I/O |
-| [NumPy](https://numpy.org) | BSD-3-Clause | Audio buffers |
 | [Qt for Python (PySide6)](https://www.qt.io/qt-for-python) | LGPL-3.0 | User interface. Loaded as unmodified shared libraries; you may replace them (rebuild from this repository with your own PySide6). |
 | [Inter](https://rsms.me/inter/) typeface (Rasmus Andersson) | SIL Open Font License 1.1 (bundled as `Inter-OFL.txt`) | UI font |
 | [Pillow](https://python-pillow.org) | MIT-CMU (HPND) | Build-time only: writes the .exe icon |
+| [pyrnnoise](https://github.com/pengzhendong/pyrnnoise) | Apache-2.0 | CI-only: its old prebuilt RNNoise is the reference for the quality test (not bundled) |
 | [PyInstaller](https://pyinstaller.org) bootloader | GPL-2.0 with bootloader exception | Packaging the exe |
 
 RNNoise BSD-3-Clause notice:

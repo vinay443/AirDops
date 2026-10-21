@@ -15,7 +15,7 @@ can check it, and explains why it is safe for the source to be public.
 | Bluetooth LE | Listens (passively decodes) for AirPods broadcast packets while your AirPods are connected | Battery level and ear detection. Never pairs, connects or sends anything. |
 | Media sessions | Pauses/resumes apps that were playing | Ear-detection auto-pause |
 | Keyboard | Registers one global shortcut (Ctrl+Alt+M by default) with Windows' `RegisterHotKey`. AirDops only ever learns that *that* combination was pressed. It never sees other keystrokes and has no keyboard hook. | Switch Game/Call Mode from inside a game |
-| Local named pipe `AirDops-<user>` | Accessible only to your Windows user; the only message it accepts is "show" | Launching AirDops a second time opens the running instance's panel |
+| Named event `Local\AirDops-show-panel` | A Windows event in your own sign-in session. It carries no data: setting it can only make the running AirDops open its panel | Launching AirDops a second time opens the running instance's panel |
 | Files | `%APPDATA%\AirDops\settings.json`, `%LOCALAPPDATA%\AirDops\` (state, logs, diagnostics) | Settings and undo information |
 
 ## What it never does
@@ -44,9 +44,10 @@ can check it, and explains why it is safe for the source to be public.
   actions are pinned to exact commit SHAs and checkout does not persist
   credentials. There is no `pull_request_target` trigger, so forks cannot run
   code with write access.
-* The RNNoise DLL is not committed. It is downloaded at build time from a
-  pinned PyPI wheel (`pyrnnoise==0.4.5`) and **its SHA-256 is verified**, so a
-  swapped file fails the build.
+* The RNNoise DLL is not committed. CI builds it from a **pinned commit** of
+  Xiph.org's RNNoise source (git verifies the content against the commit hash)
+  and a model file whose **SHA-256 is verified**, so a swapped file fails the
+  build. A test checks it against the previous prebuilt DLL.
 * Python dependencies are pinned to exact versions, and Dependabot proposes
   updates as pull requests you review.
 * Each build publishes `SHA256SUMS.txt` next to the exe and runs a self-test of

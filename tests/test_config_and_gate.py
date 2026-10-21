@@ -1,5 +1,3 @@
-import numpy as np
-
 from airdops.config import Settings, State
 from airdops.denoise.gate import VoiceGate
 
@@ -33,9 +31,9 @@ def test_state_validation():
 
 def test_voice_gate_opens_holds_and_closes():
     g = VoiceGate(hold_ms=50, release_ms=10, attack_ms=1)
-    frame = np.ones(480, dtype=np.float32)
+    frame = [1.0] * 480
     quiet = g.apply(frame, 0.0)
-    assert quiet.max() < 0.05
+    assert max(quiet) < 0.05
     for _ in range(5):
         loud = g.apply(frame, 0.9)
     assert loud[-1] > 0.95
@@ -45,3 +43,11 @@ def test_voice_gate_opens_holds_and_closes():
     for _ in range(30):
         closed = g.apply(frame, 0.1)
     assert closed[-1] < 0.05
+
+
+def test_voice_gate_step_ramps_from_previous_gain():
+    g = VoiceGate(attack_ms=1)
+    g0, g1 = g.step(0.9)
+    assert g0 == g.floor and g1 > 0.9
+    g0b, _ = g.step(0.9)
+    assert g0b == g1

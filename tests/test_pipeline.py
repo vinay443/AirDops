@@ -1,15 +1,21 @@
+import struct
 import sys
 import types
 
-import numpy as np
 import pytest
 
 from airdops.denoise import pipeline as pl
+from airdops.denoise import rnnoise
 
 
 class FakeDenoiser:
-    def process(self, frame):
-        return frame * 0.5, 0.9
+    """Halves the downmixed mic; runs the same output maths as the real thing."""
+
+    def run(self, indata, outdata, frames, in_ch, out_ch, gate=None, gain=1.0):
+        src, dst = rnnoise.float_view(indata), rnnoise.float_view(outdata)
+        buf = [sum(src[i * in_ch : (i + 1) * in_ch]) / in_ch * 32767.0 * 0.5 for i in range(frames)]
+        g0, g1 = gate.step(0.9) if gate is not None else (1.0, 1.0)
+        return rnnoise.finish_py(buf, frames, g0, g1, gain, dst, 0, out_ch), 0.9
 
     def close(self):
         pass
@@ -55,7 +61,7 @@ def make_sd(fail_first=0):
         def close(self):
             pass
 
-    sd.Stream = Stream
+    sd.RawStream = Stream
     return sd
 
 
@@ -107,9 +113,28 @@ def test_callback_processes_and_meters(fake):
     fake()
     p = pl.NoisePipeline("m", "c", gain_db=6)
     p._denoiser = FakeDenoiser()
-    indata = np.full((480, 2), 0.2, dtype=np.float32)
-    out = np.zeros((480, 2), dtype=np.float32)
+    p._channels = (2, 2)
+    indata = bytearray(struct.pack("<960f", *([0.2] * 960)))
+    out = bytearray(480 * 2 * 4)
     p._callback(indata, out, 480, None, None)
-    assert np.allclose(out[:, 0], out[:, 1])
-    assert abs(out[0, 0] - 0.2 * 0.5 * 10 ** (6 / 20)) < 1e-4
+    vals = struct.unpack("<960f", out)
+    assert vals[0::2] == vals[1::2]
+    assert abs(vals[0] - 0.2 * 0.5 * 10 ** (6 / 20)) < 1e-4
     assert 0.5 < p.level <= 1.0
+    assert p.last_voice_prob == 0.9
+
+
+def test_callback_without_denoiser_outputs_silence(fake):
+    fake()
+    p = pl.NoisePipeline("m", "c")
+    out = bytearray(b"\x01" * 480 * 4)
+    p._callback(bytearray(480 * 4), out, 480, None, None)
+    assert out == bytearray(480 * 4)
+
+
+def test_output_is_clipped_and_ramped():
+    buf = [40000.0] * 4  # louder than full scale
+    out = [0.0] * 8
+    sumsq = rnnoise.finish_py(buf, 4, 0.0, 1.0, 1.0, out, 0, 2)
+    assert out[0] == 0.0 and out[-1] == 1.0 and out[6] == out[7]
+    assert abs(sumsq - sum(v * v for v in out[0::2])) < 1e-9

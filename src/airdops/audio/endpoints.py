@@ -152,24 +152,29 @@ class DeviceWatcher:
 
     def start(self) -> bool:
         try:
-            from pycaw.callbacks import MMNotificationClient
+            # Implemented here against pycaw's interface definition rather than
+            # pycaw.callbacks, which would also pull psutil into the build.
+            from comtypes import COMObject
+            from pycaw.api.mmdeviceapi import IMMNotificationClient
 
             on_change = self._on_change
 
-            class _Client(MMNotificationClient):
-                def on_device_state_changed(self, device_id, new_state, new_state_id):
+            class _Client(COMObject):
+                _com_interfaces_ = (IMMNotificationClient,)
+
+                def OnDeviceStateChanged(self, device_id, new_state):
                     on_change()
 
-                def on_device_added(self, added_device_id):
+                def OnDeviceAdded(self, device_id):
                     on_change()
 
-                def on_device_removed(self, removed_device_id):
+                def OnDeviceRemoved(self, device_id):
                     on_change()
 
-                def on_default_device_changed(self, flow, flow_id, role, role_id, default_device_id):
+                def OnDefaultDeviceChanged(self, flow, role, device_id):
                     on_change()
 
-                def on_property_value_changed(self, device_id, property_struct, fmtid, pid):
+                def OnPropertyValueChanged(self, device_id, key):
                     pass  # very chatty, not needed
 
             self._enum = _enumerator()

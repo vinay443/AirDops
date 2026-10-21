@@ -7,8 +7,7 @@ import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import QTimer
-from PySide6.QtNetwork import QLocalServer, QLocalSocket
+from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
@@ -20,30 +19,10 @@ from .toast import Toast
 log = logging.getLogger(__name__)
 
 
-def _server_name() -> str:
-    import getpass
+class _ShowBridge(QObject):
+    """Carries the "open the panel" signal from the listener thread to the UI thread."""
 
-    try:
-        user = getpass.getuser()
-    except Exception:  # noqa: BLE001
-        user = "user"
-    return "AirDops-" + "".join(ch for ch in user if ch.isalnum())[:32]
-
-
-def signal_running_instance() -> bool:
-    """Ask an already-running AirDops to open its panel. True if it answered."""
-    from PySide6.QtCore import QCoreApplication
-
-    _app = QCoreApplication.instance() or QCoreApplication(sys.argv)  # noqa: F841 - keep alive
-    sock = QLocalSocket()
-    sock.connectToServer(_server_name())
-    if not sock.waitForConnected(800):
-        return False
-    sock.write(b"show")
-    sock.flush()
-    sock.waitForBytesWritten(800)
-    sock.disconnectFromServer()
-    return True
+    show = Signal()
 
 
 def app_icon() -> QIcon:
@@ -78,11 +57,13 @@ class Shell:
         self._toast_due: Optional[float] = None
         self._theme_tick = 0
 
-        self.server = QLocalServer()
-        QLocalServer.removeServer(_server_name())
-        self.server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
-        if self.server.listen(_server_name()):
-            self.server.newConnection.connect(self._on_local_connection)
+        # A second launch of AirDops signals this so the panel opens (see instance.py).
+        from ..instance import ShowListener
+
+        self._show_bridge = _ShowBridge()
+        self._show_bridge.show.connect(self._open_panel)
+        self.show_listener = ShowListener(self._show_bridge.show.emit)
+        self.show_listener.start()
 
         self.timer = QTimer()
         self.timer.setInterval(350)
@@ -149,6 +130,7 @@ class Shell:
 
     def quit(self) -> None:
         self.hotkey.unregister()
+        self.show_listener.stop()
         self.meter_timer.stop()
         self.panel.hide()
         self.toast.hide()
@@ -163,18 +145,6 @@ class Shell:
         for size in (16, 20, 24, 32, 40, 48):
             icon.addPixmap(art.tray_pixmap(size, self._dark_taskbar, connected, battery))
         return icon
-
-    def _on_local_connection(self) -> None:
-        sock = self.server.nextPendingConnection()
-        if sock is None:
-            return
-
-        def read() -> None:
-            if bytes(sock.readAll()).startswith(b"show"):
-                self._open_panel()
-            sock.disconnectFromServer()
-
-        sock.readyRead.connect(read)
 
     def _open_panel(self) -> None:
         self.panel.set_state(self.core.snapshot())

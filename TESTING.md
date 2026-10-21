@@ -6,8 +6,8 @@ If anything fails, open the panel, choose **More → Run Diagnostics**, and atta
 `%LOCALAPPDATA%\AirDops\logs\airdops.log` to an issue.
 
 ## 0. Setup
-- [ ] Download `AirDops.exe` (Releases or the latest Actions run). Optional: install [VB-Cable](https://vb-audio.com/Cable/) and reboot.
-- [ ] Start `AirDops.exe`. An "AirDops is running" banner slides in and an AirPods glyph appears in the tray (check the `^` overflow and drag it onto the taskbar).
+- [ ] Download `AirDops-portable.zip` (Releases or the latest Actions run) and unzip it. Optional: install [VB-Cable](https://vb-audio.com/Cable/) and reboot.
+- [ ] Start `AirDops.exe` from the unzipped folder. An "AirDops is running" banner slides in and an AirPods glyph appears in the tray (check the `^` overflow and drag it onto the taskbar).
 - [ ] Run `AirDops.exe` again: no second copy starts; the panel opens instead.
 
 ## 0b. Installer

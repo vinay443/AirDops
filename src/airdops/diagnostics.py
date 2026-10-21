@@ -85,17 +85,12 @@ def build_report(ble_seconds: float = 8.0) -> str:
     _guard(lines, ducking_section)
 
     def denoise_section() -> None:
-        import numpy as np
+        from .denoise import rnnoise
 
-        from .denoise.rnnoise import Denoiser
-
-        d = Denoiser()
-        rng = np.random.default_rng(0)
-        noise = (rng.standard_normal(480 * 50) * 0.05).astype(np.float32)
-        out = np.concatenate([d.process(noise[i : i + 480])[0] for i in range(0, len(noise), 480)])
-        d.close()
-        reduction = 20 * np.log10((np.std(noise) + 1e-9) / (np.std(out[480 * 10 :]) + 1e-9))
+        reduction, _ = rnnoise.white_noise_check(frames=50, seed=0)
+        helper = "native" if rnnoise.has_native_helper() else "Python fallback"
         lines.append(f"  RNNoise loaded; white-noise reduction: {reduction:.1f} dB")
+        lines.append(f"  realtime cost: {rnnoise.benchmark(200):.0f} us per 10 ms frame ({helper})")
 
     _section(lines, "Noise suppression engine")
     _guard(lines, denoise_section)
@@ -198,12 +193,11 @@ def self_test(out_path: str) -> int:
     def imports() -> str:
         import bleak  # noqa: F401
         import comtypes  # noqa: F401
-        import numpy  # noqa: F401
         import pycaw  # noqa: F401
         import sounddevice  # noqa: F401
         from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager  # noqa: F401
 
-        from . import controller, core, media  # noqa: F401
+        from . import controller, core, instance, media  # noqa: F401
         from .ble import scanner  # noqa: F401
         from .denoise import pipeline  # noqa: F401
         from .ui import panel, shell, toast  # noqa: F401
@@ -235,18 +229,15 @@ def self_test(out_path: str) -> int:
         return f"{len(paths)} screens rendered"
 
     def rnnoise() -> str:
-        import numpy as np
+        from .denoise import rnnoise as rn
 
-        from .denoise.rnnoise import Denoiser
-
-        d = Denoiser()
-        noise = (np.random.default_rng(1).standard_normal(480 * 100) * 0.05).astype(np.float32)
-        out = np.concatenate([d.process(noise[i : i + 480])[0] for i in range(0, len(noise), 480)])
-        d.close()
-        red = 20 * np.log10(np.std(noise) / (np.std(out[4800:]) + 1e-9))
+        red, prob = rn.white_noise_check(frames=100, seed=1)
         if red < 6:
             raise AssertionError(f"noise only reduced by {red:.1f} dB")
-        return f"{red:.1f} dB reduction"
+        if not rn.has_native_helper():
+            raise AssertionError("bundled RNNoise lacks the AirDops DSP helper")
+        cost = rn.benchmark(500)
+        return f"{red:.1f} dB reduction, mean voice prob {prob:.2f}, {cost:.0f} us per 10 ms frame"
 
     def com() -> str:
         from .audio import endpoints
@@ -271,7 +262,26 @@ def self_test(out_path: str) -> int:
 
         return f"{len(sd.query_hostapis())} host APIs"
 
+    def single_instance() -> str:
+        import threading
+
+        from .instance import ShowListener, signal_running_instance
+
+        got = threading.Event()
+        listener = ShowListener(got.set)
+        if not listener.start():
+            raise AssertionError("could not create the show-panel event")
+        try:
+            if not signal_running_instance() or not got.wait(2):
+                raise AssertionError("show-panel signal not delivered")
+        finally:
+            listener.stop()
+        if signal_running_instance():
+            raise AssertionError("event still present after stop")
+        return ""
+
     check("imports", imports)
+    check("single-instance", single_instance)
     check("rnnoise", rnnoise)
     check("ui", ui)
     check("portaudio", portaudio)

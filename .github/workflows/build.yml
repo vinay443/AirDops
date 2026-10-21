@@ -39,13 +39,22 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libxkbcommon0 libfontconfig1 libglib2.0-0 libdbus-1-3
       - name: Install dependencies
         run: python -m pip install -r requirements.txt -r requirements-dev.txt
-      - name: Fetch RNNoise (hash-verified)
-        if: runner.os == 'Windows'
-        run: python scripts/fetch_rnnoise.py
+      - name: Build RNNoise from pinned Xiph source
+        run: python scripts/build_rnnoise.py
+      - name: Fetch the old RNNoise build (test reference only, hash-verified)
+        shell: bash
+        run: echo "AIRDOPS_RNNOISE_REFERENCE=$(python scripts/fetch_rnnoise.py)" >> "$GITHUB_ENV"
       - name: Unit tests
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -v
+      - name: RNNoise quality vs the old build
+        if: always()
+        shell: bash
+        run: |
+          if [ -f build/rnnoise-quality.txt ]; then
+            while IFS= read -r line; do echo "::notice title=RNNoise quality (${{ runner.os }})::$line"; done < build/rnnoise-quality.txt
+          fi
 
   build:
     needs: test
@@ -59,28 +68,34 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: python -m pip install -r requirements.txt -r requirements-build.txt
-      - name: Fetch RNNoise (hash-verified)
-        run: python scripts/fetch_rnnoise.py
+      - name: Build RNNoise from pinned Xiph source
+        run: python scripts/build_rnnoise.py
       - name: Generate icon and version info
         run: |
           python scripts/make_icon.py
           python scripts/make_version_info.py
-      - name: Build AirDops.exe (portable)
-        run: pyinstaller --noconfirm --clean airdops.spec
-      - name: Smoke-test the built exe
-        shell: pwsh
-        run: |
-          $p = Start-Process -FilePath dist\AirDops.exe -ArgumentList '--self-test', "$PWD\selftest.txt" -Wait -PassThru
-          Get-Content selftest.txt
-          if ($p.ExitCode -ne 0) { throw "self-test failed with exit code $($p.ExitCode)" }
-      - name: Build installer (per-user, no admin)
+      - name: Build AirDops (folder build, used by the installer and the portable zip)
         shell: pwsh
         run: |
           $env:AIRDOPS_ONEDIR = "1"
-          pyinstaller --noconfirm airdops.spec
-          $p = Start-Process -FilePath dist\AirDops\AirDops.exe -ArgumentList '--self-test', "$PWD\selftest-onedir.txt" -Wait -PassThru
-          Get-Content selftest-onedir.txt
-          if ($p.ExitCode -ne 0) { throw "onedir self-test failed" }
+          pyinstaller --noconfirm --clean airdops.spec
+      - name: Self-test the built exe
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\AirDops\AirDops.exe -ArgumentList '--self-test', "$PWD\selftest.txt" -Wait -PassThru
+          Get-Content selftest.txt
+          Get-Content selftest.txt | ForEach-Object { "::notice title=Self-test::$_" }
+          if ($p.ExitCode -ne 0) { throw "self-test failed with exit code $($p.ExitCode)" }
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          Push-Location dist
+          & 7z a -tzip -mx=9 -mfb=258 -mpass=15 AirDops-portable.zip AirDops | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "zip failed" }
+          Pop-Location
+      - name: Build installer (per-user, no admin)
+        shell: pwsh
+        run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
             choco install innosetup --no-progress -y | Out-Null
@@ -88,11 +103,12 @@ jobs:
           $ver = python -c "import sys; sys.path.insert(0, 'src'); import airdops; print(airdops.__version__)"
           & $iscc /Qp "/DAppVersion=$ver" installer\AirDops.iss
           if ($LASTEXITCODE -ne 0) { throw "installer build failed" }
-          Get-Item dist\AirDops-Setup.exe
+      - name: Size report and budget
+        run: python scripts/size_report.py dist/AirDops dist/AirDops-Setup.exe dist/AirDops-portable.zip
       - name: Checksum
         shell: pwsh
         run: |
-          $lines = foreach ($f in 'AirDops.exe', 'AirDops-Setup.exe') {
+          $lines = foreach ($f in 'AirDops-Setup.exe', 'AirDops-portable.zip') {
             $h = (Get-FileHash "dist\$f" -Algorithm SHA256).Hash.ToLower()
             "$h  $f"
           }
@@ -104,8 +120,8 @@ jobs:
         with:
           name: AirDops-windows
           path: |
-            dist/AirDops.exe
             dist/AirDops-Setup.exe
+            dist/AirDops-portable.zip
             dist/SHA256SUMS.txt
             dist/selftest.txt
             dist/previews/
@@ -132,5 +148,5 @@ jobs:
           fi
           PRE=""
           case "$TAG" in *-*) PRE="--prerelease" ;; esac
-          gh release create "$TAG" dist/AirDops-Setup.exe dist/AirDops.exe dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/AirDops-Setup.exe dist/AirDops-portable.zip dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --title "AirDops $TAG" --generate-notes --target "$GITHUB_SHA" $PRE

@@ -8,8 +8,8 @@ mic out when nobody is speaking, with a short hold so word endings are kept.
 from __future__ import annotations
 
 import math
-
-import numpy as np
+from array import array
+from typing import Sequence
 
 
 class VoiceGate:
@@ -46,11 +46,20 @@ class VoiceGate:
                 self._hold = self.hold_frames
         return 1.0 if self._open else self.floor
 
-    def apply(self, frame: np.ndarray, prob: float) -> np.ndarray:
+    def step(self, prob: float) -> tuple[float, float]:
+        """Advance one frame; returns the gain at the start and end of the frame.
+
+        The audio code ramps linearly between the two, which avoids zipper noise.
+        """
         start = self.gain
         tgt = self.target(prob)
         coeff = self.attack if tgt > self.gain else self.release
         self.gain = self.gain + (tgt - self.gain) * coeff
-        # Linear ramp across the frame avoids zipper noise.
-        ramp = np.linspace(start, self.gain, num=len(frame), dtype=np.float32)
-        return frame * ramp
+        return start, self.gain
+
+    def apply(self, frame: Sequence[float], prob: float) -> array:
+        """Gate one frame (convenience/test helper; the realtime path uses :meth:`step`)."""
+        g0, g1 = self.step(prob)
+        n = len(frame)
+        inc = (g1 - g0) / (n - 1) if n > 1 else 0.0
+        return array("f", (v * (g0 + inc * i) for i, v in enumerate(frame)))

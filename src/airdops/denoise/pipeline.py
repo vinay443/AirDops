@@ -11,11 +11,11 @@ into it; it does not install or modify any driver.
 
 from __future__ import annotations
 
+import ctypes
 import logging
+import math
 import threading
 from typing import Optional
-
-import numpy as np
 
 from .gate import VoiceGate
 from .rnnoise import FRAME_SIZE, SAMPLE_RATE, Denoiser
@@ -60,6 +60,7 @@ class NoisePipeline:
         self._gate = VoiceGate()
         self._lock = threading.Lock()
         self._status_count = 0
+        self._channels = (1, 1)
         self.last_voice_prob = 0.0
         self.level = 0.0  # 0..1, output loudness for the UI meter
 
@@ -74,28 +75,18 @@ class NoisePipeline:
         self.gain = float(10 ** (gain_db / 20.0))
 
     def _callback(self, indata, outdata, frames, time_info, status) -> None:  # realtime thread
+        """sounddevice RawStream callback: interleaved float32 buffers, no NumPy."""
         if status:
             self._status_count += 1
-        mono = indata.mean(axis=1) if indata.shape[1] > 1 else indata[:, 0]
-        out = np.empty(frames, dtype=np.float32)
         den = self._denoiser
-        for start in range(0, frames, FRAME_SIZE):
-            chunk = mono[start : start + FRAME_SIZE]
-            if den is None:
-                clean = chunk.astype(np.float32)
-                prob = 1.0
-            else:
-                clean, prob = den.process(chunk)
-            if self.voice_gate_enabled:
-                clean = self._gate.apply(clean, prob)
-            out[start : start + len(chunk)] = clean
-            self.last_voice_prob = prob
-        if self.gain != 1.0:
-            out *= self.gain
-        np.clip(out, -1.0, 1.0, out=out)
-        outdata[:] = out[:, None]
-        rms = float(np.sqrt(np.mean(out * out))) if frames else 0.0
-        db = 20.0 * np.log10(rms + 1e-9)
+        in_ch, out_ch = self._channels
+        if den is None or frames <= 0:
+            ctypes.memset(ctypes.addressof(ctypes.c_char.from_buffer(outdata)), 0, len(outdata))
+            return
+        gate = self._gate if self.voice_gate_enabled else None
+        sumsq, prob = den.run(indata, outdata, frames, in_ch, out_ch, gate, self.gain)
+        self.last_voice_prob = prob
+        db = 10.0 * math.log10(sumsq / frames + 1e-18)  # 20*log10(rms)
         self.level = max(0.0, min(1.0, (db + 60.0) / 54.0))  # -60 dBFS..-6 dBFS -> 0..1
 
     def start(self) -> None:
@@ -116,6 +107,7 @@ class NoisePipeline:
             out_ch = max(1, min(2, int(out_info["max_output_channels"])))
             self._denoiser = Denoiser()
             self._gate = VoiceGate()
+            self._channels = (in_ch, out_ch)
             extra = None
             if hasattr(sd, "WasapiSettings"):
                 try:
@@ -131,7 +123,8 @@ class NoisePipeline:
             # Prefer low latency; fall back to safer settings on picky drivers.
             for latency, settings in (("low", extra), ("high", extra), ("high", None)):
                 try:
-                    stream = sd.Stream(
+                    # RawStream hands the callback plain buffers, so NumPy isn't needed.
+                    stream = sd.RawStream(
                         device=(in_idx, out_idx),
                         samplerate=SAMPLE_RATE,
                         blocksize=FRAME_SIZE,

@@ -109,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
                 _message_box("Quit AirDops from the tray first, then run --restore.")
             return 1
         if not args.background:
-            from .ui.shell import signal_running_instance
+            from .instance import signal_running_instance
 
             if not signal_running_instance():
                 _message_box("AirDops is already running - click the AirPods icon in the system tray.")

@@ -23,8 +23,11 @@ OutputBaseFilename=AirDops-Setup
 SetupIconFile=..\build\AirDops.ico
 UninstallDisplayIcon={app}\AirDops.exe
 UninstallDisplayName=AirDops
-Compression=lzma2/max
+; Smallest download: LZMA2 with a big dictionary over one solid block.
+Compression=lzma2/ultra64
 SolidCompression=yes
+LZMAUseSeparateProcess=yes
+LZMANumFastBytes=273
 WizardStyle=modern
 ; Ask to close a running AirDops (it holds this mutex) before installing/uninstalling.
 AppMutex=AirDops-single-instance
