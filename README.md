@@ -117,7 +117,7 @@ and unused parts of Qt, OpenSSL and the C runtime are left out.
 Measured by `AirDops.exe --bench report.txt` on GitHub's Windows build
 machine (no AirPods attached), installed folder build:
 
-| | v0.3.0-beta.1 build | v0.4.0-beta.1 |
+| | Before the v0.4 runtime changes | v0.4.0-beta.1 |
 |---|---|---|
 | Launch to tray icon, first / second launch | 1.79 s / 0.59 s | 1.09 s / 0.58 s |
 | CPU while idle in the tray | ≈0.1% of one core | 0.05–0.1% of one core (wakes every 2 s instead of every 0.35 s) |
