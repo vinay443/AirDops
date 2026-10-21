@@ -39,15 +39,30 @@ class _MemCounters(ctypes.Structure):
     ]
 
 
+def _kernel32():
+    k = ctypes.WinDLL("kernel32")
+    k.GetCurrentProcess.restype = wintypes.HANDLE
+    k.GetCurrentProcess.argtypes = []
+    pft = ctypes.POINTER(wintypes.FILETIME)
+    k.GetProcessTimes.argtypes = [wintypes.HANDLE, pft, pft, pft, pft]
+    k.GetProcessTimes.restype = wintypes.BOOL
+    k.GetSystemTimePreciseAsFileTime.argtypes = [pft]
+    k.GetSystemTimePreciseAsFileTime.restype = None
+    k.K32GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(_MemCounters), wintypes.DWORD]
+    k.K32GetProcessMemoryInfo.restype = wintypes.BOOL
+    return k
+
+
 def _filetime(ft: wintypes.FILETIME) -> float:
     return ((ft.dwHighDateTime << 32) | ft.dwLowDateTime) / 1e7  # seconds
 
 
 def process_times() -> tuple[float, float]:
     """(seconds since this process was created, CPU seconds used so far)."""
-    k = ctypes.windll.kernel32
+    k = _kernel32()
     create, exit_, kern, user, now = (wintypes.FILETIME() for _ in range(5))
-    k.GetProcessTimes(k.GetCurrentProcess(), ctypes.byref(create), ctypes.byref(exit_), ctypes.byref(kern), ctypes.byref(user))
+    if not k.GetProcessTimes(k.GetCurrentProcess(), ctypes.byref(create), ctypes.byref(exit_), ctypes.byref(kern), ctypes.byref(user)):
+        raise OSError("GetProcessTimes failed")
     k.GetSystemTimePreciseAsFileTime(ctypes.byref(now))
     return _filetime(now) - _filetime(create), _filetime(kern) + _filetime(user)
 
@@ -56,8 +71,9 @@ def memory_mb() -> tuple[float, float]:
     """(working set MB, private bytes MB)."""
     c = _MemCounters()
     c.cb = ctypes.sizeof(c)
-    k = ctypes.windll.kernel32
-    k.K32GetProcessMemoryInfo(k.GetCurrentProcess(), ctypes.byref(c), c.cb)
+    k = _kernel32()
+    if not k.K32GetProcessMemoryInfo(k.GetCurrentProcess(), ctypes.byref(c), c.cb):
+        raise OSError("GetProcessMemoryInfo failed")
     return c.WorkingSetSize / 1e6, c.PrivateUsage / 1e6
 
 

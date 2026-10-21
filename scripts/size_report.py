@@ -61,6 +61,9 @@ def main(args: list[str]) -> int:
         for line in lines:
             if line.startswith("download "):
                 print(f"::notice title=Size::{line}")
+        biggest = [line.strip() for line in lines if line.startswith("  ")]
+        if biggest:
+            print("::notice title=Biggest bundled files::" + "%0A".join(biggest))
         for name in over:
             print(f"::error title=Size budget::{name} is over its size budget (see scripts/size_report.py)")
     return 1 if over else 0
