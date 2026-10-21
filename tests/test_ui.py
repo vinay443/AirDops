@@ -110,3 +110,56 @@ def test_welcome_and_new_rows(app):
     assert ("set_gain", 9.0) in rec.calls
     panel.set_state(DISCONNECTED)
     assert panel.row_level.isHidden()
+
+
+class FakeCore:
+    """Just enough of airdops.core.Core for the shell."""
+
+    def __init__(self):
+        import types
+
+        self.settings = types.SimpleNamespace(mode="game", hotkey="", onboarded=True)
+        self.controller = types.SimpleNamespace(endpoints=[1])
+        self.state = ViewState(name="AirPods Pro", connected=False)
+        self.on_change = lambda: None
+        self.snapshots = 0
+
+    def snapshot(self):
+        self.snapshots += 1
+        return self.state
+
+    def pop_notifications(self):
+        return []
+
+    def mic_level(self):
+        return 0.0
+
+
+def test_shell_refreshes_on_engine_events_not_a_fast_timer(app):
+    import threading
+    import time
+
+    from airdops.ui.shell import Shell
+
+    core = FakeCore()
+    shell = Shell(core, background=True)
+    try:
+        assert shell.timer.interval() >= 2000  # housekeeping only
+        assert core.on_change is not None
+        shell._refresh()
+        before = core.snapshots
+        core.state = ViewState(name="AirPods Pro", connected=True)
+        t = threading.Thread(target=core.on_change)  # engine threads call this
+        t.start()
+        t.join()
+        deadline = time.monotonic() + 2
+        while core.snapshots == before and time.monotonic() < deadline:
+            app.processEvents()
+        assert core.snapshots > before
+        assert shell._last.connected
+        assert not shell.meter_timer.isActive()  # panel closed: no 50 ms meter
+    finally:
+        shell.show_listener.stop()
+        shell.hotkey.unregister()
+        shell.panel.hide()
+        shell.toast.hide()

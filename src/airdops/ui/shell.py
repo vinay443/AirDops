@@ -20,9 +20,10 @@ log = logging.getLogger(__name__)
 
 
 class _ShowBridge(QObject):
-    """Carries the "open the panel" signal from the listener thread to the UI thread."""
+    """Carries signals from background threads to the UI thread (queued)."""
 
-    show = Signal()
+    show = Signal()  # another launch asked for the panel
+    changed = Signal()  # the engine has news (device, battery, notification)
 
 
 def app_icon() -> QIcon:
@@ -55,7 +56,7 @@ class Shell:
         self.tray.activated.connect(self._on_tray)
         self._last: Optional[ViewState] = None
         self._toast_due: Optional[float] = None
-        self._theme_tick = 0
+        self._theme_checked = 0.0
 
         # A second launch of AirDops signals this so the panel opens (see instance.py).
         from ..instance import ShowListener
@@ -65,8 +66,12 @@ class Shell:
         self.show_listener = ShowListener(self._show_bridge.show.emit)
         self.show_listener.start()
 
+        # The engine signals changes (see Core.on_change), so this timer is only
+        # housekeeping: theme changes, stale battery readings, banner timing.
+        self._show_bridge.changed.connect(self._refresh)
+        self.core.on_change = self._show_bridge.changed.emit
         self.timer = QTimer()
-        self.timer.setInterval(350)
+        self.timer.setInterval(2000)
         self.timer.timeout.connect(self._refresh)
         # Fast timer just for the live mic meter while the panel is open.
         self.meter_timer = QTimer()
@@ -149,12 +154,14 @@ class Shell:
     def _open_panel(self) -> None:
         self.panel.set_state(self.core.snapshot())
         self.panel.show_at(self.tray.geometry())
+        self._refresh()  # starts the level meter right away if needed
 
     def _on_tray(self, reason) -> None:
         if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
             self.toast.hide()
             self.panel.set_state(self.core.snapshot())
             self.panel.toggle_at(self.tray.geometry())
+            self._refresh()
         elif reason == QSystemTrayIcon.ActivationReason.Context:
             self._context_menu()
 
@@ -190,9 +197,10 @@ class Shell:
 
     # ------------------------------------------------------------ refresh
     def _check_theme(self) -> None:
-        self._theme_tick += 1
-        if self._theme_tick % 6:
+        now = time.monotonic()
+        if now - self._theme_checked < 1.9:
             return
+        self._theme_checked = now
         pal = theme.current()
         dark_tb = theme.taskbar_is_dark()
         if pal is not self._palette:
@@ -221,6 +229,7 @@ class Shell:
         now = time.monotonic()
         if last is not None and st.connected and not last.connected:
             self._toast_due = now + 3.0
+            QTimer.singleShot(3050, self._refresh)
         if not st.connected:
             self._toast_due = None
         if self._toast_due is not None and (st.battery_known or now >= self._toast_due):
@@ -233,8 +242,10 @@ class Shell:
         if self._banners and not self.toast.isVisible() and self._toast_due is None:
             title, msg = self._banners.pop(0)
             self.toast.popup(st, title, msg, ms=6000)
-        if self.panel.isVisible() != self.meter_timer.isActive():
-            if self.panel.isVisible():
+        # The 50 ms level meter only runs while it is on screen.
+        want_meter = self.panel.isVisible() and st.ns_active
+        if want_meter != self.meter_timer.isActive():
+            if want_meter:
                 self.meter_timer.start()
             else:
                 self.meter_timer.stop()
@@ -254,6 +265,9 @@ class Shell:
         return line
 
     def _tick_meter(self) -> None:
+        if not self.panel.isVisible():
+            self.meter_timer.stop()
+            return
         try:
             self.panel.update_level(self.core.mic_level())
         except Exception:  # noqa: BLE001

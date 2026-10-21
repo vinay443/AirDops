@@ -41,6 +41,11 @@ a = Analysis(
         "ssl", "_ssl", "_hashlib", "ftplib", "smtplib", "imaplib", "poplib", "xmlrpc", "http.server",
         # Developer tooling from the standard library.
         "pydoc", "pydoc_data", "doctest", "unittest", "pdb", "lib2to3",
+        # Mail/web/XML/archive modules nothing in the app or its dependencies uses at runtime
+        # (unicodedata is only reached through the IDNA codec for hostnames).
+        "email", "http", "urllib.request", "mimetypes", "xml", "pyexpat", "_elementtree",
+        "unicodedata", "stringprep", "encodings.idna", "multiprocessing", "concurrent.futures.process",
+        "tarfile", "lzma", "_lzma", "bz2", "_bz2",
         "PySide6.QtNetwork", "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtPdf", "PySide6.QtSvg",
         "PySide6.QtOpenGL", "PySide6.QtSql", "PySide6.QtTest", "PySide6.QtConcurrent", "PySide6.QtDBus",
     ],
@@ -61,6 +66,8 @@ _DROP = (
     "PySide6/plugins/platforms/qminimal.dll",
     "PySide6/plugins/platforms/qoffscreen.dll",
     "libcrypto-", "libssl-",       # OpenSSL (Python's ssl module and Qt's TLS plugin)
+    # The Universal C Runtime is part of Windows 10 and 11 (AirDops needs Windows 10+ for WinRT).
+    "api-ms-win-", "ucrtbase.dll",
     # PortAudio builds for other CPUs/OSes; sounddevice loads libportaudio64bit.dll on x64.
     "portaudio-binaries/libportaudio32bit", "portaudio-binaries/libportaudioarm64",
     "portaudio-binaries/libportaudio64bit-asio", "portaudio-binaries/libportaudio.dylib",

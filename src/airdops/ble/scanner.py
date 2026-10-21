@@ -23,6 +23,8 @@ from .advert import APPLE_COMPANY_ID, PodsStatus, family, parse_proximity
 
 log = logging.getLogger(__name__)
 
+PASSIVE_GRACE_S = 30.0
+
 
 class BatteryMonitor:
     def __init__(self, on_status: Callable[[PodsStatus, float], None], min_rssi: int = -70) -> None:
@@ -37,6 +39,10 @@ class BatteryMonitor:
         self._best_rssi = -999
         self._best_at = 0.0
         self.error: Optional[str] = None
+        # Passive scanning only listens (no scan requests), which is all AirPods
+        # broadcasts need. Falls back to active if passive hears nothing.
+        self.passive = True
+        self._heard = False
 
     # ---- lifecycle -------------------------------------------------------
     def start(self) -> None:
@@ -85,6 +91,7 @@ class BatteryMonitor:
         status = parse_proximity(data)
         if status is None:
             return
+        self._heard = True
         rssi = adv.rssi if adv.rssi is not None else -999
         if rssi < self.min_rssi:
             return
@@ -112,14 +119,28 @@ class BatteryMonitor:
             try:
                 from bleak import BleakScanner
 
-                scanner = BleakScanner(detection_callback=self._detection)
-                await scanner.start()
+                mode = "passive" if self.passive else "active"
+                scanner = BleakScanner(detection_callback=self._detection, scanning_mode=mode)
+                try:
+                    await scanner.start()
+                except Exception:
+                    if not self.passive:
+                        raise
+                    log.info("passive BLE scanning unavailable; using active scanning")
+                    self.passive = False
+                    continue
                 self._scanning.set()
+                self._heard = False
                 self.error = None
-                log.info("Bluetooth LE battery scan started")
+                started = time.monotonic()
+                log.info("Bluetooth LE battery scan started (%s)", mode)
                 try:
                     while self._want_scan.is_set() and not self._stop.is_set():
                         await asyncio.sleep(1)
+                        if self.passive and not self._heard and time.monotonic() - started > PASSIVE_GRACE_S:
+                            log.info("no AirPods broadcasts heard passively; switching to active scanning")
+                            self.passive = False
+                            break
                 finally:
                     await scanner.stop()
                     self._scanning.clear()

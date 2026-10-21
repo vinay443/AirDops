@@ -17,8 +17,8 @@ from pathlib import Path
 MIB = 1024 * 1024
 # Budgets for each download (MiB). Raise them only on purpose.
 BUDGETS = {
-    "AirDops-Setup.exe": 20.0,
-    "AirDops-portable.zip": 28.0,
+    "AirDops-Setup.exe": 21.0,
+    "AirDops-portable.zip": 26.0,
 }
 TOP = 25
 

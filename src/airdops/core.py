@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 from collections import deque
-from typing import Optional
+from typing import Callable, Optional
 
 from . import __version__, config, startup
 from .audio.router import CALL, GAME
@@ -24,6 +24,8 @@ from .ui.model import ViewState
 log = logging.getLogger(__name__)
 
 BATTERY_STALE_S = 90.0
+# With Windows device-change events working, polling is only a safety net.
+EVENT_POLL_S = 10.0
 NOTIFY_COOLDOWN_S = 600.0
 VBCABLE_URL = "https://vb-audio.com/Cable/"
 
@@ -86,6 +88,8 @@ class Core:
         self._restore_requested = threading.Event()
         self._worker: Optional[threading.Thread] = None
         self._startup_enabled = self._read_startup()
+        # Called (from any thread) when something the UI shows may have changed.
+        self.on_change: Callable[[], None] = lambda: None
 
     # --------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -110,8 +114,10 @@ class Core:
         from .audio.endpoints import DeviceWatcher
 
         watcher = DeviceWatcher(self._wake.set)
-        if watcher.start():
+        events = watcher.start()
+        if events:
             log.info("listening for audio device changes")
+        poll = max(self.settings.poll_seconds, EVENT_POLL_S) if events else self.settings.poll_seconds
         try:
             while not self._stop.is_set():
                 try:
@@ -128,9 +134,10 @@ class Core:
                         self._paused_apps = []
                 except Exception:  # noqa: BLE001
                     log.exception("tick failed")
+                self._changed_ui()
                 # Device events wake us instantly (so the AirPods mic is blocked
                 # before apps can grab it); polling is the safety net.
-                if self._wake.wait(self.settings.poll_seconds):
+                if self._wake.wait(poll):
                     time.sleep(0.12)  # coalesce bursts of events
                 self._wake.clear()
             self.monitor.set_scanning(False)
@@ -148,6 +155,13 @@ class Core:
         self._last_notified[key] = now
         log.info("notify: %s - %s", title, message)
         self._notifications.append((title, message))
+        self._changed_ui()
+
+    def _changed_ui(self) -> None:
+        try:
+            self.on_change()
+        except Exception:  # noqa: BLE001
+            log.debug("on_change failed", exc_info=True)
 
     def pop_notifications(self) -> list[tuple[str, str]]:
         out = []
@@ -297,8 +311,11 @@ class Core:
     # ------------------------------------------------------------ BLE side
     def _on_pods(self, pods: PodsStatus, now: float) -> None:
         """Called on the BLE thread for every accepted AirPods broadcast."""
+        changed = pods != self.pods or self._pods_fresh() is None
         self.pods = pods
         self.pods_at = time.monotonic()
+        if changed:
+            self._changed_ui()
         if not self.controller.status.connected:
             return
         if self.settings.auto_pause:
