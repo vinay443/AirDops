@@ -119,10 +119,10 @@ machine (no AirPods attached), installed folder build:
 
 | | v0.3.0-beta.1 build | v0.4.0-beta.1 |
 |---|---|---|
-| Launch to tray icon, first / second launch | 1.79 s / 0.59 s | 1.04 s / 0.57 s |
-| CPU while idle in the tray | ≈0.1% of one core | ≈0.1% of one core (now wakes every 2 s, not every 0.35 s) |
-| CPU with the panel open | 0.9–1.6% | 0.9–1.3% (the 50 ms level meter only runs while noise suppression is live) |
-| Memory while idle (working set / private) | 80 MB / 41 MB | 79 MB / 40 MB |
+| Launch to tray icon, first / second launch | 1.79 s / 0.59 s | 1.09 s / 0.58 s |
+| CPU while idle in the tray | ≈0.1% of one core | 0.05–0.1% of one core (wakes every 2 s instead of every 0.35 s) |
+| CPU with the panel open | 0.9–1.6% (measured including the fade-in) | ≈0.1% once open; the 50 ms level meter only runs while noise suppression is live |
+| Memory while idle (working set / private) | 80 MB / 41 MB | 80 MB / 40 MB |
 | Noise suppression, per 10 ms of audio | — | 0.25 ms (about 2.5% of one core) |
 
 Most of the remaining size and memory is Qt and Python themselves. CI fails
