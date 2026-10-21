@@ -14,7 +14,8 @@ def pytest_runtest_logreport(report):
     if not os.environ.get("GITHUB_ACTIONS") or not report.failed:
         return
     detail = str(report.longrepr)[-3000:]
-    sys.__stdout__.write(f"::error title=Test failed: {report.nodeid}::{_escape(detail)}\n")
+    title = _escape(report.nodeid).replace(":", "%3A").replace(",", "%2C")
+    sys.__stdout__.write(f"::error title=Test failed %3A {title}::{_escape(detail)}\n")
     sys.__stdout__.flush()
 
 
